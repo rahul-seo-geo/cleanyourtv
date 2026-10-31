@@ -9,6 +9,7 @@ the core bigger or change how it behaves. You install an add-on only if you want
 
 | Add-on | What it does | Author | Tested on | Permissions | Screenshot |
 |---|---|---|---|---|---|
+| [New In](newin/) | Live Game Day fixtures, OwnTV Watch Next, Jellyfin latest and continue watching, Seerr requests | [gathin](https://github.com/gathin) | TCL 65C6K, Android TV 14 | network access, read TV listings | <img src="newin/screenshot.jpg" width="240" alt="New In on a TV"> |
 | [Jewish Calendar](jewish-calendar/) | Offline Hebrew and Gregorian dates, holiday/Shabbat greetings, and an optional clock screensaver | [lionlev21](https://github.com/lionlev21) | Android TV 12 (model private) | None | <img src="jewish-calendar/screenshot.jpg" width="240" alt="Jewish Calendar on a TV"> |
 | [Nepali Calendar](nepali-calendar/) | Offline Bikram Sambat and Gregorian dates in Devanagari and Latin, a BS month grid with weekends and fixed-date national days in red, and an optional clock screensaver | [@1yuv](https://github.com/1yuv) | Hisense 50A6H4 (SmartTV 4K, songshan), Android TV 11 | None | <img src="nepali-calendar/screenshot.jpg" width="240" alt="Nepali Calendar on a TV"> |
 | [Frigate Glance](frigate-glance/) | Frigate camera pop-ups over whatever is playing | [NickLD](https://github.com/NickLD) | TCL 65Q650G | overlay, accessibility (card keys), network, foreground service, start at boot | <img src="frigate-glance/screenshot.jpg" width="240" alt="Frigate Glance on a TV"> |

@@ -1,0 +1,7 @@
+# Copy to settings.txt and replace placeholders locally. Never commit settings.txt.
+jellyfin_url=http://YOUR_JELLYFIN_HOST:8096
+jellyfin_key=YOUR_JELLYFIN_API_KEY
+jellyfin_user=YOUR_JELLYFIN_USER_ID
+jellyseerr_url=http://YOUR_SEERR_HOST:5055
+jellyseerr_key=YOUR_SEERR_API_KEY
+live_sports_app=com.cricfytv.sports

@@ -8,8 +8,10 @@ extra ask: link feeds into the apps actually watched on — Cricfy and OwnTV).
 
 1. Home shows each sports team's next fixture with a countdown: Arsenal (Premier League),
    Real Madrid (Champions League / La Liga), France Men's national team.
-2. A new add-on shows Jellyfin latest additions, Jellyfin continue-watching, Jellyseerr
-   request status, and OwnTV continue rows, each item opening the app it belongs to.
+2. A new add-on shows Jellyfin latest additions, Jellyfin continue-watching, Seerr
+   request status (Seerr is Jellyseerr's successor — Jellyseerr and Overseerr were archived
+   in February 2026; the NAS already runs Seerr 3.5.1), and OwnTV continue rows, each item
+   opening the app it belongs to.
 3. Live sport links into Cricfy.
 4. The launcher core (`launcher/`) does not change. Everything is add-ons and configuration,
    per the repo's add-on rules (`docs/workflows/addon.md`).
@@ -41,7 +43,7 @@ project, wrappers copied from `addons/game-day`, following `docs/workflows/addon
 
 ### Module card
 
-Label `New In`, caption `Jellyfin & Jellyseerr`, accent glow. Owner answers Show once; tile
+Label `New In`, caption `Jellyfin & Seerr`, accent glow. Owner answers Show once; tile
 sits ahead of the grid; OK opens the app.
 
 ### Rows (top to bottom)
@@ -76,7 +78,7 @@ implementation; if the view action does not resolve, the fallback becomes perman
 jellyfin_url=http://192.168.0.158:8096
 jellyfin_key=<api key>
 jellyfin_user=<user id>
-jellyseerr_url=http://192.168.0.158:5055
+jellyseerr_url=http://192.168.0.158:5055   # Seerr (Jellyseerr successor; key names kept)
 jellyseerr_key=<api key>
 live_sports_app=com.cricfytv.sports
 ```
@@ -105,6 +107,11 @@ for the parsing and row-mapping logic (status badges, Watch Next filter, cache f
 matching the repo's `launcher/app/src/test` style. `launcher/` never mentions the add-on.
 
 ## Verification (needs the TV awake — ADB currently refused, TV in standby)
+
+Already verified (2026-10-31): the NAS's `jellyseerr` container now runs Seerr
+(`ghcr.io/seerr-team/seerr:latest`, v3.5.1, no update pending, web UI up); `/api/v1/request`
+exists on it (401 without a key; a bogus path 404s), so the request row's endpoint is
+unchanged. Watchtower keeps the `:latest` image current.
 
 1. On-TV probes (before building rows that depend on them):
    - `pm list packages` → confirm OwnTV's package id and Cricfy's.

@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <uses-feature android:name="android.software.leanback" android:required="false" />
+    <uses-feature android:name="android.hardware.touchscreen" android:required="false" />
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.READ_TV_LISTINGS" />
+    <application android:allowBackup="false" android:usesCleartextTraffic="true"
+        android:icon="@drawable/icon" android:label="@string/app_name"
+        android:supportsRtl="false" android:theme="@style/Screen">
+        <service android:name=".NewsDream" android:exported="true"
+            android:permission="android.permission.BIND_DREAM_SERVICE">
+            <intent-filter>
+                <action android:name="android.service.dreams.DreamService" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </service>
+        <provider android:name=".FilesProvider" android:authorities="com.gathin.news.files"
+            android:exported="true" android:permission="android.permission.WRITE_SECURE_SETTINGS" />
+    </application>
+</manifest>

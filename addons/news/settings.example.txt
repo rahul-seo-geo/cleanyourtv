@@ -1,0 +1,7 @@
+jellyseerr_url=http://YOUR_SEERR_HOST:5055
+jellyseerr_key=YOUR_SEERR_API_KEY
+slide_seconds=18
+feed1=https://www.abc.net.au/news/feed/51120/rss.xml|ABC News
+feed2=https://feeds.bbci.co.uk/news/rss.xml|BBC News
+feed3=https://feeds.bbci.co.uk/sport/football/teams/arsenal/rss.xml|Arsenal
+feed4=https://feeds.bbci.co.uk/sport/football/teams/real-madrid/rss.xml|Real Madrid

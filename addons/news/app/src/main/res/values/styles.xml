@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Screen" parent="@android:style/Theme.Material.NoActionBar.Fullscreen">
+        <item name="android:windowBackground">@drawable/screen</item>
+        <item name="android:colorAccent">#FF3CBE78</item>
+    </style>
+
+</resources>

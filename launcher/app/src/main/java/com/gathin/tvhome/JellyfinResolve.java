@@ -10,9 +10,9 @@ final class JellyfinResolve {
 
     static String itemId(MediaLoader.Fetcher fetcher, String base, String apiKey, String tmdbId) {
         if (base.isEmpty() || apiKey.isEmpty() || tmdbId == null || tmdbId.isEmpty()) return null;
-        String url = base + "/Items?Recursive=true&AnyProviderIdEquals=Tmdb." + tmdbId
-                + "&Limit=1&api_key=" + apiKey;
-        byte[] body = fetcher.get(url, Map.of());
+        String url = base + "/Items?Recursive=true&AnyProviderIdEquals=Tmdb." + tmdbId + "&Limit=1";
+        byte[] body = fetcher.get(url,
+                Map.of("Authorization", "MediaBrowser Token=\"" + apiKey + "\""));
         if (body == null) return null;
         try {
             JSONArray items = new JSONObject(new String(body, java.nio.charset.StandardCharsets.UTF_8))

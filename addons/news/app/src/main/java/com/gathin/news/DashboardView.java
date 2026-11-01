@@ -1,6 +1,7 @@
 package com.gathin.news;
 
 import android.content.Context;
+import android.content.Intent;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Outline;
@@ -9,6 +10,7 @@ import android.os.Handler;
 import android.os.Looper;
 import android.text.TextUtils;
 import android.view.Gravity;
+import android.view.KeyEvent;
 import android.view.View;
 import android.view.ViewOutlineProvider;
 import android.widget.FrameLayout;
@@ -26,10 +28,21 @@ public final class DashboardView extends FrameLayout {
 
     public interface PosterLoader { byte[] load(String url); }
 
+    public static final class LaunchItem {
+        final String label;
+        final Intent launchIntent;
+
+        public LaunchItem(String label, Intent launchIntent) {
+            this.label = label;
+            this.launchIntent = launchIntent;
+        }
+    }
+
     private static final int SUPPORTING_SLOTS = 5;
     private static final int MATCH_SLOTS = 4;
     private static final int CHIP_SLOTS = 8;
-    private static final int LAUNCHER_SLOTS = 6;
+    static final int LAUNCHER_SLOTS = 6;
+    private static final long LAUNCHER_HIDE_MS = 10_000L;
 
     private static final int TITLE = 0xFFF2F7FC;
     private static final int TITLE_STALE = 0xC8F2F7FC;
@@ -37,6 +50,7 @@ public final class DashboardView extends FrameLayout {
     private static final int META_STALE = 0x994FC3F7;
     private static final int DIM = 0xFF6B7A8C;
     private static final int CARD = 0x14F2F7FC;
+    private static final int CARD_FOCUSED = 0x2EF2F7FC;
     private static final int LIVE = 0xFF3CBE78;
     private static final int BAR_VACANT = 0x33FFFFFF;
 
@@ -51,8 +65,14 @@ public final class DashboardView extends FrameLayout {
     private final ImageView leadPoster;
     private final TextView matchEmpty;
     private final LinearLayout launcherRow;
+    private final TextView launcherEmpty;
+    private final TextView[] launcherSlots = new TextView[LAUNCHER_SLOTS];
     private final StoryCell[] supporting = new StoryCell[SUPPORTING_SLOTS];
     private final MatchCell[] matches = new MatchCell[MATCH_SLOTS];
+    private final Runnable hideLauncher = () -> setLauncherVisible(false);
+    private List<LaunchItem> launcherItems = List.of();
+    private boolean launcherTargetsKnown;
+    private boolean backDownConsumed;
 
     private static final class StoryCell {
         final TextView title;
@@ -212,11 +232,29 @@ public final class DashboardView extends FrameLayout {
             slot.setTextColor(TITLE);
             slot.setTextSize(26);
             slot.setGravity(Gravity.CENTER);
-            slot.setBackground(cardBackground(CARD));
+            GradientDrawable idle = cardBackground(CARD);
+            GradientDrawable focused = cardBackground(CARD_FOCUSED);
+            focused.setStroke(6, META);
+            slot.setBackground(idle);
+            slot.setFocusable(true);
+            slot.setOnFocusChangeListener((view, hasFocus) ->
+                    view.setBackground(hasFocus ? focused : idle));
+            int index = i;
+            slot.setOnClickListener(v -> launch(index));
             LinearLayout.LayoutParams slotParams = new LinearLayout.LayoutParams(0, 88, 1f);
             slotParams.leftMargin = 24;
             launcherRow.addView(slot, slotParams);
+            launcherSlots[i] = slot;
         }
+        launcherEmpty = new TextView(context);
+        launcherEmpty.setTextColor(DIM);
+        launcherEmpty.setTextSize(24);
+        launcherEmpty.setGravity(Gravity.CENTER);
+        launcherEmpty.setBackground(cardBackground(CARD));
+        launcherEmpty.setVisibility(GONE);
+        LinearLayout.LayoutParams emptyParams = new LinearLayout.LayoutParams(0, 88, 1f);
+        emptyParams.leftMargin = 24;
+        launcherRow.addView(launcherEmpty, emptyParams);
         addView(launcherRow, new FrameLayout.LayoutParams(-1, -2, Gravity.BOTTOM));
     }
 
@@ -238,7 +276,91 @@ public final class DashboardView extends FrameLayout {
     }
 
     public void setLauncherVisible(boolean visible) {
-        launcherRow.setVisibility(visible ? VISIBLE : GONE);
+        if (visible) {
+            launcherRow.setVisibility(VISIBLE);
+            scheduleHide();
+        } else {
+            handler.removeCallbacks(hideLauncher);
+            backDownConsumed = false;
+            launcherRow.setVisibility(GONE);
+        }
+    }
+
+    public void setLauncherTargets(List<LaunchItem> items, boolean anyConfigured) {
+        launcherItems = items;
+        int count = Math.min(items.size(), LAUNCHER_SLOTS);
+        for (int i = 0; i < LAUNCHER_SLOTS; i++) {
+            TextView slot = launcherSlots[i];
+            boolean used = i < count;
+            slot.setVisibility(used ? VISIBLE : GONE);
+            if (used) slot.setText(items.get(i).label);
+        }
+        boolean empty = count == 0;
+        if (empty) launcherEmpty.setText(!launcherTargetsKnown ? "Loading apps..."
+                : anyConfigured ? "No launchable apps" : "No apps configured");
+        launcherEmpty.setVisibility(empty ? VISIBLE : GONE);
+        launcherTargetsKnown = true;
+        if (empty || launcherRow.getVisibility() != VISIBLE) return;
+        boolean focusValid = false;
+        for (int i = 0; i < count && !focusValid; i++) focusValid = launcherSlots[i].hasFocus();
+        if (!focusValid) launcherSlots[0].requestFocus();
+    }
+
+    boolean onDreamKey(KeyEvent event) {
+        int action = event.getAction();
+        int keyCode = event.getKeyCode();
+        if (keyCode == KeyEvent.KEYCODE_BACK) {
+            if (action == KeyEvent.ACTION_DOWN && launcherRow.getVisibility() == VISIBLE) {
+                backDownConsumed = true;
+                setLauncherVisible(false);
+                return true;
+            }
+            if (action == KeyEvent.ACTION_UP && backDownConsumed) {
+                backDownConsumed = false;
+                return true;
+            }
+            return false;
+        }
+        if (launcherRow.getVisibility() == VISIBLE) {
+            scheduleHide();
+            return false;
+        }
+        if (action == KeyEvent.ACTION_DOWN && isRevealKey(keyCode)) {
+            setLauncherVisible(true);
+            if (!launcherItems.isEmpty()) launcherSlots[0].requestFocus();
+            return true;
+        }
+        return false;
+    }
+
+    private static boolean isRevealKey(int keyCode) {
+        switch (keyCode) {
+            case KeyEvent.KEYCODE_DPAD_UP:
+            case KeyEvent.KEYCODE_DPAD_DOWN:
+            case KeyEvent.KEYCODE_DPAD_LEFT:
+            case KeyEvent.KEYCODE_DPAD_RIGHT:
+            case KeyEvent.KEYCODE_DPAD_CENTER:
+            case KeyEvent.KEYCODE_ENTER:
+                return true;
+            default:
+                return false;
+        }
+    }
+
+    private void launch(int index) {
+        if (index >= launcherItems.size()) return;
+        LaunchItem item = launcherItems.get(index);
+        try {
+            getContext().startActivity(
+                    new Intent(item.launchIntent).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+        } catch (RuntimeException e) {
+            setLauncherVisible(false);
+        }
+    }
+
+    private void scheduleHide() {
+        handler.removeCallbacks(hideLauncher);
+        handler.postDelayed(hideLauncher, LAUNCHER_HIDE_MS);
     }
 
     public void setClockText(String text) {
@@ -250,20 +372,31 @@ public final class DashboardView extends FrameLayout {
     }
 
     @Override protected void onDetachedFromWindow() {
+        handler.removeCallbacksAndMessages(null);
         posters.shutdownNow();
         super.onDetachedFromWindow();
     }
 
     private void renderChips(Map<String, DashboardSnapshot.SourceStatus> sources, long now) {
+        int total = sources.size();
+        boolean overflow = total > CHIP_SLOTS;
+        int labelSlots = overflow ? CHIP_SLOTS - 1 : CHIP_SLOTS;
         int index = 0;
         for (Map.Entry<String, DashboardSnapshot.SourceStatus> entry : sources.entrySet()) {
-            if (index >= CHIP_SLOTS) break;
+            if (index >= labelSlots) break;
             DashboardSnapshot.SourceStatus status = entry.getValue();
             TextView chip = chips[index++];
             chip.setText(DashboardFormat.chipLabel(entry.getKey(), status.freshness, now, status.updatedMs));
             chip.setTextColor(status.freshness == DashboardSnapshot.Freshness.FRESH ? TITLE
                     : status.freshness == DashboardSnapshot.Freshness.STALE ? META : DIM);
             chip.setVisibility(VISIBLE);
+        }
+        if (overflow) {
+            TextView chip = chips[labelSlots];
+            chip.setText("+" + (total - labelSlots));
+            chip.setTextColor(DIM);
+            chip.setVisibility(VISIBLE);
+            index = labelSlots + 1;
         }
         for (int i = index; i < CHIP_SLOTS; i++) chips[i].setVisibility(GONE);
     }

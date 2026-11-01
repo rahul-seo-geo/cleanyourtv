@@ -94,6 +94,13 @@ final class GameDayReader {
         return new GameDayResult(State.UNAVAILABLE, Collections.emptyList(), TURN_DEFAULT);
     }
 
+    static Object[] rowFromCursor(Cursor cursor) {
+        return new Object[] {cursor.getString(0), cursor.getString(1),
+                cursor.getType(2) == Cursor.FIELD_TYPE_INTEGER ? cursor.getLong(2) : null,
+                cursor.getType(3) == Cursor.FIELD_TYPE_INTEGER ? cursor.getLong(3) : null,
+                cursor.getInt(4), cursor.getString(5), cursor.getInt(6)};
+    }
+
     private static final class AndroidSource implements ProviderSource {
         private final Context context;
         private final PackageManager pm;
@@ -120,9 +127,7 @@ final class GameDayReader {
                 if (cursor == null) return null;
                 List<Object[]> rows = new ArrayList<>();
                 while (cursor.moveToNext()) {
-                    rows.add(new Object[] {cursor.getString(0), cursor.getString(1),
-                            cursor.getLong(2), cursor.getLong(3), cursor.getInt(4),
-                            cursor.getString(5), cursor.getInt(6)});
+                    rows.add(rowFromCursor(cursor));
                 }
                 return rows;
             }

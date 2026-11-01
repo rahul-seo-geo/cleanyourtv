@@ -1,5 +1,7 @@
 package com.gathin.news;
 
+import android.database.Cursor;
+import java.lang.reflect.Proxy;
 import java.util.Arrays;
 import java.util.Collections;
 import org.junit.Test;
@@ -10,6 +12,40 @@ public class GameDayReaderTest {
 
     private static Object[] row(String topLine, Object start, Object end, Object seconds) {
         return new Object[] {topLine, "Puck drop", start, end, 0xFF123456, "calendar", seconds};
+    }
+
+    private static Cursor cursor(Object[] data) {
+        return (Cursor) Proxy.newProxyInstance(Cursor.class.getClassLoader(), new Class<?>[] {Cursor.class},
+                (proxy, method, args) -> {
+                    int column = args == null || args.length == 0 ? -1 : (Integer) args[0];
+                    Object value = column < 0 ? null : data[column];
+                    switch (method.getName()) {
+                        case "moveToNext": return true;
+                        case "isNull": return value == null;
+                        case "getType": return value == null ? Cursor.FIELD_TYPE_NULL
+                                : value instanceof Number ? Cursor.FIELD_TYPE_INTEGER : Cursor.FIELD_TYPE_STRING;
+                        case "getLong": return value == null ? 0L : value instanceof Number
+                                ? ((Number) value).longValue() : Long.parseLong((String) value);
+                        case "getInt": return value == null ? 0 : ((Number) value).intValue();
+                        case "getString": return value == null ? null : value.toString();
+                        default: throw new UnsupportedOperationException(method.getName());
+                    }
+                });
+    }
+
+    @Test public void nullStartInCursorNeverBecomesLive() {
+        Cursor source = cursor(row("Wild at Stars", null, NOW + 1000, 30));
+        GameDayReader.GameDayResult result = GameDayReader.mapRows(
+                Collections.singletonList(GameDayReader.rowFromCursor(source)), NOW);
+        assertEquals(GameDayReader.State.UNAVAILABLE, result.state);
+        assertTrue(result.matches.isEmpty());
+    }
+
+    @Test public void textEndInCursorIsUnavailable() {
+        Cursor source = cursor(row("Wild at Stars", NOW - 1000, "2000000", 30));
+        GameDayReader.GameDayResult result = GameDayReader.mapRows(
+                Collections.singletonList(GameDayReader.rowFromCursor(source)), NOW);
+        assertEquals(GameDayReader.State.UNAVAILABLE, result.state);
     }
 
     @Test public void futureStartIsUpcomingWithoutFabricatedScore() {

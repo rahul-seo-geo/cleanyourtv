@@ -28,7 +28,7 @@ final class MediaSettings {
                 if (equals > 0) {
                     String key = line.substring(0, equals).trim();
                     String val = line.substring(equals + 1).trim();
-                    if (key.endsWith("_url") && val.endsWith("//")) {
+                    if (key.endsWith("_url")) {
                         while (val.endsWith("/")) {
                             val = val.substring(0, val.length() - 1);
                         }

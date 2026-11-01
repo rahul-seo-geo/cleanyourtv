@@ -10,13 +10,14 @@ public class MediaSettingsTest {
                 + "seerr_url = https://seerr.example/\n"
                 + "\n"
                 + "m3u_url=http://nas:8096/playlist.m3u\n");
-        assertEquals("https://seerr.example/", s.get("seerr_url"));
+        assertEquals("https://seerr.example", s.get("seerr_url"));
         assertEquals("http://nas:8096/playlist.m3u", s.get("m3u_url"));
         assertEquals("", s.get("seerr_key"));
     }
 
     @Test public void trimsTrailingSlashesFromUrls() {
         assertEquals("https://seerr.example", MediaSettings.parse("seerr_url=https://seerr.example///").get("seerr_url"));
+        assertEquals("https://seerr.example", MediaSettings.parse("seerr_url=https://seerr.example/").get("seerr_url"));
     }
 
     @Test public void anySourceFalseWhenEmptyAndTruePerSource() {

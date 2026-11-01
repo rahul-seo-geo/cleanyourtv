@@ -22,6 +22,10 @@ final class SeerrSource {
     static List<MediaCard> parseRequests(byte[] body) {
         List<MediaCard> cards = new ArrayList<>();
         JSONArray entries = array(body);
+        if (entries == null) {
+            JSONObject page = object(body);
+            entries = page == null ? null : page.optJSONArray("results");
+        }
         if (entries == null) return cards;
         for (int i = 0; i < entries.length() && cards.size() < 64; i++) {
             JSONObject entry = entries.optJSONObject(i);
@@ -49,8 +53,8 @@ final class SeerrSource {
             String tmdb = String.valueOf(entry.optLong("id", 0));
             String title = bound(entry.optString(kind == MediaCard.Kind.SERIES ? "name" : "title", ""));
             if (title.isEmpty()) continue;
-            long when = epochDay(entry.optString(kind == MediaCard.Kind.SERIES
-                    ? "first_air_date" : "release_date", ""));
+            long when = epochDay(entry.optString(kind == MediaCard.Kind.SERIES ? "firstAirDate" : "releaseDate",
+                    entry.optString(kind == MediaCard.Kind.SERIES ? "first_air_date" : "release_date", "")));
             cards.add(new MediaCard("tmdb:" + tmdb, kind, title, "", MediaCard.State.UPCOMING,
                     when, 0, tmdb, ""));
         }

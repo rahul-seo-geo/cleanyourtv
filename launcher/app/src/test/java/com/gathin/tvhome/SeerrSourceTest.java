@@ -35,6 +35,16 @@ public class SeerrSourceTest {
         assertTrue(odd.title.startsWith("TMDB "));
     }
 
+    @Test public void acceptsPagedRequestsWrapper() {
+        String body = "{\"pageInfo\":{\"page\":1,\"results\":1},\"results\":["
+                + "{\"id\":9,\"status\":3,\"media\":{\"mediaType\":\"movie\",\"tmdbId\":157336}}"
+                + "]}";
+        List<MediaCard> cards = SeerrSource.parseRequests(json(body));
+        assertEquals(1, cards.size());
+        assertEquals("TMDB 157336", cards.get(0).title);
+        assertEquals(MediaCard.State.AVAILABLE, cards.get(0).state);
+    }
+
     @Test public void garbageBodyYieldsEmpty() {
         assertTrue(SeerrSource.parseRequests(json("not json")).isEmpty());
         assertTrue(SeerrSource.parseRequests(null).isEmpty());
@@ -53,6 +63,16 @@ public class SeerrSourceTest {
         assertTrue(movies.get(0).whenMs > 0);
         assertEquals("Upcoming Show", series.get(0).title);
         assertEquals(179_000_000_000L < series.get(0).whenMs, true);
+    }
+
+    @Test public void upcomingReadsCamelCaseDates() {
+        String body = "{\"results\":[{\"title\":\"Doomsday\",\"releaseDate\":\"2026-12-16\"},"
+                + "{\"name\":\"Potter\",\"firstAirDate\":\"2026-12-25\"}]}";
+        List<MediaCard> movies = SeerrSource.parseUpcoming(json(body), MediaCard.Kind.MOVIE);
+        List<MediaCard> series = SeerrSource.parseUpcoming(json(body), MediaCard.Kind.SERIES);
+        assertEquals("Doomsday", movies.get(0).title);
+        assertTrue(movies.get(0).whenMs > 0);
+        assertTrue(series.get(0).whenMs > 0);
     }
 
     @Test public void urlsAndHeadersMatchNewsAddonContract() {

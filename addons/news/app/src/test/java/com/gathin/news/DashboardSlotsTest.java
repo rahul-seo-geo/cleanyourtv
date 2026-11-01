@@ -84,12 +84,59 @@ public class DashboardSlotsTest {
                 Collections.singletonList(story(null, "b", "B", 2, false, false)), 2);
 
         assertEquals(2, result.size());
-        assertNull(result.get(0));
+        assertEquals("story-0", result.get(0).slotId);
+        assertNull(result.get(0).contentIdentity);
         assertEquals("story-1", result.get(1).slotId);
         try {
             result.add(story(null, "c", "C", 3, false, false));
             fail("slot list should be immutable");
         } catch (UnsupportedOperationException expected) { }
+    }
+
+    @Test public void expiryReplacesOnlyExpiredSlotAtBoundary() {
+        List<DashboardSnapshot.StorySlot> previous = Arrays.asList(
+                story("story-0", "a", "Old A", 99, false, false),
+                story("story-1", "b", "Old B", 100, false, false));
+        List<DashboardSnapshot.StorySlot> result = DashboardSlots.reconcile(previous,
+                Arrays.asList(story(null, "b", "Current B", 100, false, false),
+                        story(null, "a", "Expired A", 99, true, true),
+                        story(null, "c", "Replacement", 150, false, false)),
+                200, new DashboardSlots.Policy(2, 100));
+
+        assertEquals("c", result.get(0).contentIdentity);
+        assertEquals("story-0", result.get(0).slotId);
+        assertEquals("b", result.get(1).contentIdentity);
+        assertEquals("story-1", result.get(1).slotId);
+        assertEquals("Current B", result.get(1).title);
+    }
+
+    @Test public void staleLiveScoreIsRejected() {
+        try {
+            new DashboardSnapshot.MatchSlot("fixture-1", "Arsenal vs Chelsea",
+                    DashboardSnapshot.MatchPhase.LIVE, "2–1", 100, 200, 0xff112233,
+                    DashboardSnapshot.Freshness.STALE);
+            fail("stale scores must not appear live");
+        } catch (IllegalArgumentException expected) { }
+    }
+
+    @Test public void unavailableLiveScoreIsRejected() {
+        try {
+            new DashboardSnapshot.MatchSlot("fixture-1", "Arsenal vs Chelsea",
+                    DashboardSnapshot.MatchPhase.LIVE, "2–1", 100, 200, 0xff112233,
+                    DashboardSnapshot.Freshness.UNAVAILABLE);
+            fail("unavailable scores must not appear live");
+        } catch (IllegalArgumentException expected) { }
+    }
+
+    @Test public void freshLiveAndStaleFinalRemainValid() {
+        assertEquals(DashboardSnapshot.MatchPhase.LIVE,
+                new DashboardSnapshot.MatchSlot("fixture-1", "Arsenal vs Chelsea",
+                        DashboardSnapshot.MatchPhase.LIVE, "2–1", 100, 200, 0xff112233,
+                        DashboardSnapshot.Freshness.FRESH).phase);
+        assertEquals(DashboardSnapshot.MatchPhase.FINAL,
+                new DashboardSnapshot.MatchSlot("fixture-1", "Arsenal vs Chelsea",
+                        DashboardSnapshot.MatchPhase.FINAL, "2–1", 100, 200, 0xff112233,
+                        DashboardSnapshot.Freshness.STALE).phase);
     }
 
     @Test public void snapshotOwnsImmutableCopiesOfAllCollections() {

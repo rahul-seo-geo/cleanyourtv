@@ -39,7 +39,8 @@ final class DashboardSnapshot {
                   String destinationUrl, long publishedMs, ContentKind contentKind,
                   boolean cached, boolean stale) {
             this.slotId = slotId;
-            this.contentIdentity = contentIdentity == null || contentIdentity.isEmpty()
+            this.contentIdentity = contentKind == null ? null
+                    : contentIdentity == null || contentIdentity.isEmpty()
                     ? identity(destinationUrl, source, title, publishedMs) : contentIdentity;
             this.title = title;
             this.source = source;
@@ -53,6 +54,14 @@ final class DashboardSnapshot {
         StorySlot withSlotId(String id) {
             return new StorySlot(id, contentIdentity, title, source, destinationUrl,
                     publishedMs, contentKind, cached, stale);
+        }
+
+        static StorySlot vacant(String id) {
+            return new StorySlot(id, null, null, null, null, 0, null, false, false);
+        }
+
+        boolean isVacant() {
+            return contentKind == null;
         }
 
         private static String identity(String url, String source, String title, long publishedMs) {
@@ -77,6 +86,8 @@ final class DashboardSnapshot {
 
         MatchSlot(String fixtureKey, String topLine, MatchPhase phase, String scoreOrCountdown,
                   long startMs, long endMs, int colorArgb, Freshness freshness) {
+            if (phase == MatchPhase.LIVE && freshness != Freshness.FRESH)
+                throw new IllegalArgumentException("live matches require fresh scores");
             this.fixtureKey = fixtureKey;
             this.topLine = topLine;
             this.phase = phase;

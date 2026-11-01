@@ -52,7 +52,7 @@ public class MediaLoaderTest {
     @Test public void failedSeerrFallsBackToCacheMarkedStaleAndOthersStayFresh() {
         responses.put("http://nas/p.m3u", json("#EXTM3U\n#EXTINF:-1,ABC\nhttp://nas/abc.ts\n"));
         stored.put("seerr-request", json(
-                "[{\"id\":1,\"status\":3,\"media\":{\"mediaType\":\"movie\",\"tmdbId\":550,\"title\":\"Old\"}]"));
+                "[{\"id\":1,\"status\":3,\"media\":{\"mediaType\":\"movie\",\"tmdbId\":550,\"title\":\"Old\"}}]"));
         ages.put("seerr-request", 900L);
         stored.put("seerr-upcoming-movie", json("{\"results\":[]}"));
         stored.put("seerr-upcoming-series", json("{\"results\":[]}"));
@@ -63,6 +63,25 @@ public class MediaLoaderTest {
         assertEquals(MediaSnapshot.Freshness.STALE, snapshot.sources.get("seerr").freshness);
         assertEquals("Old", snapshot.movies.get(0).title);
         assertEquals(MediaSnapshot.Freshness.FRESH, snapshot.sources.get("playlist").freshness);
+    }
+
+    @Test public void emptyCachedSeerrResponsesAreUnavailable() {
+        stored.put("seerr-request", json("[]"));
+        stored.put("seerr-upcoming-movie", json("{\"results\":[]}"));
+        stored.put("seerr-upcoming-series", json("{\"results\":[]}"));
+
+        MediaSnapshot snapshot = loader().load(settings(), MediaSnapshot.empty());
+        assertEquals(MediaSnapshot.Freshness.UNAVAILABLE, snapshot.sources.get("seerr").freshness);
+        assertTrue(snapshot.movies.isEmpty());
+        assertTrue(snapshot.series.isEmpty());
+    }
+
+    @Test public void emptyCachedPlaylistIsUnavailable() {
+        stored.put("playlist", json("#EXTM3U\n"));
+
+        MediaSnapshot snapshot = loader().load(settings(), MediaSnapshot.empty());
+        assertEquals(MediaSnapshot.Freshness.UNAVAILABLE, snapshot.sources.get("playlist").freshness);
+        assertTrue(snapshot.live.isEmpty());
     }
 
     @Test public void unavailableSourcesAreMarkedNotBorrowed() {

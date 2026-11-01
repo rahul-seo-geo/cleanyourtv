@@ -20,12 +20,12 @@ final class MediaLoader {
 
     private final Fetcher fetcher;
     private final Store store;
-    private final Sports sports;
+    private Sports sports;
     private final LongSupplier clock;
     private final Handler main;
     private final Listener listener;
     private final MediaSettings settings;
-    private final GameDay provider;
+    private GameDay provider;
     private final long refreshMs;
     private final ExecutorService io = Executors.newSingleThreadExecutor();
     private final Runnable refreshLoop = this::refresh;
@@ -51,11 +51,20 @@ final class MediaLoader {
     }
 
     static MediaLoader create(Context context, MediaSettings settings, Handler main, Listener listener) {
-        GameDay provider = GameDay.create(context, settings.get("game_day_pkg"), main, () -> { });
-        return new MediaLoader(new Fetch(), new MediaStore(context),
-                provider == null ? () -> List.of() : provider::turns,
-                System::currentTimeMillis, settings, main, listener, provider,
+        MediaLoader loader = new MediaLoader(new Fetch(), new MediaStore(context),
+                () -> List.of(), System::currentTimeMillis, settings, main, listener, null,
                 settings.refreshMinutes() * 60_000L);
+        GameDay provider = GameDay.create(context, settings.get("game_day_pkg"), main,
+                loader::refreshOnProviderChange);
+        loader.provider = provider;
+        if (provider != null) loader.sports = provider::turns;
+        return loader;
+    }
+
+    private void refreshOnProviderChange() {
+        if (!running) return;
+        main.removeCallbacks(refreshLoop);
+        refresh();
     }
 
     void start() {
@@ -146,10 +155,8 @@ final class MediaLoader {
                 SeerrSource.upcomingUrl(base, MediaCard.Kind.SERIES)};
         for (int i = 0; i < keys.length; i++) {
             byte[] body = fetcher.get(urls[i], headers);
-            boolean fromCache = body == null;
-            if (fromCache) {
+            if (body == null) {
                 body = store.read(keys[i]);
-                if (body != null) cached = true;
             } else {
                 store.put(keys[i], body);
                 fresh = true;
@@ -158,13 +165,7 @@ final class MediaLoader {
             List<MediaCard> cards = i == 0 ? SeerrSource.parseRequests(body)
                     : SeerrSource.parseUpcoming(body,
                     i == 1 ? MediaCard.Kind.MOVIE : MediaCard.Kind.SERIES);
-            if (i == 0 && fromCache && cards.isEmpty()) {
-                String text = new String(body, StandardCharsets.UTF_8);
-                if (text.endsWith("}]") && text.startsWith("[{")) {
-                    cards = SeerrSource.parseRequests(
-                            (text.substring(0, text.length() - 1) + "}]").getBytes(StandardCharsets.UTF_8));
-                }
-            }
+            if (!fresh && !cards.isEmpty()) cached = true;
             for (MediaCard card : cards) {
                 (card.kind == MediaCard.Kind.SERIES ? series : movies).add(card);
             }
@@ -183,6 +184,6 @@ final class MediaLoader {
         if (body != null) live.addAll(PlaylistSource.parse(new String(body, StandardCharsets.UTF_8), 64));
         statuses.put("playlist", new MediaSnapshot.SourceState(fresh
                 ? MediaSnapshot.Freshness.FRESH
-                : (body == null ? MediaSnapshot.Freshness.UNAVAILABLE : MediaSnapshot.Freshness.STALE), now));
+                : (live.isEmpty() ? MediaSnapshot.Freshness.UNAVAILABLE : MediaSnapshot.Freshness.STALE), now));
     }
 }

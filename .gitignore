@@ -16,8 +16,14 @@ traces/
 bench-results/
 .DS_Store
 
+# Isolated implementation workspaces stay out of contributions.
+.worktrees/
+
 # Generated install bundles and JVM crash reports stay out of contributions.
 *.apk
 *.aab
 launcher/hs_err_pid*.log
 launcher/replay_pid*.log
+
+# SDD implementation workspaces
+.superpowers/

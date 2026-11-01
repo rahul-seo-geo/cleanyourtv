@@ -4,6 +4,7 @@ import android.content.Context;
 import android.util.AttributeSet;
 import android.view.LayoutInflater;
 import android.view.View;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 import java.util.ArrayList;
@@ -19,6 +20,7 @@ public final class MediaBand extends LinearLayout {
             {MediaCard.Kind.MOVIE, MediaCard.Kind.SERIES, MediaCard.Kind.SPORTS, MediaCard.Kind.LIVE};
 
     private Host host;
+    private PosterLoader posters;
     private int selected; // index into ORDER
     private final Map<String, View> cardViews = new HashMap<>();
     private MediaSnapshot snapshot = MediaSnapshot.empty();
@@ -31,6 +33,7 @@ public final class MediaBand extends LinearLayout {
     }
 
     public void setHost(Host host) { this.host = host; }
+    void setPosterLoader(PosterLoader p) { this.posters = p; }
 
     void apply(MediaSnapshot next) {
         snapshot = next;
@@ -58,6 +61,9 @@ public final class MediaBand extends LinearLayout {
             tab.setSelected(idx == selected);
             tab.setTextColor(idx == selected ? 0xB3FFFFFF : 0x66FFFFFF);
             tab.setOnClickListener(v -> { selected = idx; bindRail(); bindRow(); });
+            tab.setOnFocusChangeListener((v, hasFocus) -> {
+                if (hasFocus && selected != idx) { selected = idx; bindRail(); bindRow(); }
+            });
         }
     }
 
@@ -93,6 +99,15 @@ public final class MediaBand extends LinearLayout {
         View accent = view.findViewById(R.id.cardAccent);
         accent.setVisibility(card.accent == 0 ? GONE : VISIBLE);
         if (card.accent != 0) accent.setBackgroundColor(card.accent);
+        ImageView art = view.findViewById(R.id.cardArt);
+        View scrim = view.findViewById(R.id.cardScrim);
+        if (posters == null || card.artUrl.isEmpty()) {
+            art.setTag(null); // An old fetch must not put art back onto a text-only card.
+            art.setVisibility(GONE);
+            scrim.setVisibility(GONE);
+        } else {
+            posters.load(art, scrim, card.artUrl);
+        }
     }
 
     static String stateText(MediaCard card) {

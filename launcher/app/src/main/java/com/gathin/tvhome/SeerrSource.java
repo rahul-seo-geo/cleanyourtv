@@ -9,10 +9,26 @@ import java.util.Map;
 /** Seerr requests and upcoming releases. Defensive parsing only: a bad entry is skipped, never fatal. */
 final class SeerrSource {
     private static final int MAX_TITLE = 96;
+    private static final String TMDB_POSTER = "https://image.tmdb.org/t/p/w342";
 
     static Map<String, String> headers(String apiKey) { return Map.of("X-Api-Key", apiKey); }
 
     static String requestsUrl(String base) { return base + "/api/v1/request"; }
+
+    /** "/xx.jpg" to a full w342 URL; "" when missing or not a root-relative path. */
+    static String posterUrl(String posterPath) {
+        return posterPath != null && posterPath.startsWith("/") && posterPath.length() > 1
+                && !posterPath.startsWith("//") ? TMDB_POSTER + posterPath : "";
+    }
+
+    static String detailUrl(String base, MediaCard.Kind kind, String tmdbId) {
+        return base + "/api/v1/" + (kind == MediaCard.Kind.SERIES ? "tv" : "movie") + "/" + tmdbId;
+    }
+
+    static String parsePoster(byte[] body) {
+        JSONObject detail = object(body);
+        return detail == null ? "" : posterUrl(detail.optString("posterPath", ""));
+    }
 
     static String upcomingUrl(String base, MediaCard.Kind kind) {
         return base + (kind == MediaCard.Kind.SERIES
@@ -37,7 +53,7 @@ final class SeerrSource {
             MediaCard.Kind kind = "tv".equals(media.optString("mediaType"))
                     ? MediaCard.Kind.SERIES : MediaCard.Kind.MOVIE;
             cards.add(new MediaCard("tmdb:" + tmdb, kind, title, "", state(entry.optInt("status", -1)),
-                    0, 0, tmdb, ""));
+                    0, 0, tmdb, "", ""));
         }
         return cards;
     }
@@ -56,7 +72,7 @@ final class SeerrSource {
             long when = epochDay(entry.optString(kind == MediaCard.Kind.SERIES ? "firstAirDate" : "releaseDate",
                     entry.optString(kind == MediaCard.Kind.SERIES ? "first_air_date" : "release_date", "")));
             cards.add(new MediaCard("tmdb:" + tmdb, kind, title, "", MediaCard.State.UPCOMING,
-                    when, 0, tmdb, ""));
+                    when, 0, tmdb, "", posterUrl(entry.optString("posterPath", ""))));
         }
         return cards;
     }

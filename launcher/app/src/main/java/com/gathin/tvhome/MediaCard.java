@@ -20,9 +20,11 @@ final class MediaCard {
     final String tmdbId;
     /** Stream URL for LIVE channels; "" when none. */
     final String streamUrl;
+    /** Poster/logo URL (TMDB w342, tvg-logo); "" when the card has no art. */
+    final String artUrl;
 
     MediaCard(String id, Kind kind, String title, String line, State state,
-              long whenMs, int accent, String tmdbId, String streamUrl) {
+              long whenMs, int accent, String tmdbId, String streamUrl, String artUrl) {
         this.id = id;
         this.kind = kind;
         this.title = title;
@@ -32,5 +34,6 @@ final class MediaCard {
         this.accent = accent;
         this.tmdbId = tmdbId == null ? "" : tmdbId;
         this.streamUrl = streamUrl == null ? "" : streamUrl;
+        this.artUrl = artUrl == null ? "" : artUrl;
     }
 }

@@ -9,12 +9,13 @@ final class PlaylistSource {
     private static final int MAX_TITLE = 64;
     private static final int MAX_GROUP = 32;
     private static final int MAX_URL = 1024;
+    private static final int MAX_LOGO = 1024;
 
     static List<MediaCard> parse(String text, int cap) {
         List<MediaCard> cards = new ArrayList<>();
         if (text == null || cap <= 0) return cards;
         int i = 0;
-        String pendingName = null, pendingGroup = "";
+        String pendingName = null, pendingGroup = "", pendingLogo = "";
         while (i < text.length() && cards.size() < cap) {
             int end = text.indexOf('\n', i);
             if (end < 0) end = text.length();
@@ -29,6 +30,7 @@ final class PlaylistSource {
                 pendingName = comma >= 0 && comma + 1 < line.length()
                         ? bound(line.substring(comma + 1).trim(), MAX_TITLE) : "";
                 pendingGroup = bound(attribute(line, "group-title"), MAX_GROUP);
+                pendingLogo = logo(attribute(line, "tvg-logo"));
             } else if (line.startsWith("#")) {
                 // Any other tag sits between EXTINF and its URL: keep the pending pair alive.
             } else if (pendingName != null) {
@@ -37,10 +39,11 @@ final class PlaylistSource {
                     String name = pendingName.isEmpty()
                             ? bound(url.substring(url.lastIndexOf('/') + 1), MAX_TITLE) : pendingName;
                     cards.add(new MediaCard(url, MediaCard.Kind.LIVE, name, pendingGroup,
-                            MediaCard.State.AVAILABLE, 0, 0, "", url));
+                            MediaCard.State.AVAILABLE, 0, 0, "", url, pendingLogo));
                 }
                 pendingName = null;
                 pendingGroup = "";
+                pendingLogo = "";
             }
             i = end + 1;
         }
@@ -54,6 +57,12 @@ final class PlaylistSource {
         int from = at + key.length() + 2;
         int to = line.indexOf('"', from);
         return to < 0 ? "" : line.substring(from, to);
+    }
+
+    /** tvg-logo attribute value when it is a plausible http(s) URL; "" otherwise. */
+    private static String logo(String value) {
+        String v = bound(value == null ? "" : value, MAX_LOGO);
+        return v.contains("://") ? v : "";
     }
 
     private static String bound(String value, int max) {

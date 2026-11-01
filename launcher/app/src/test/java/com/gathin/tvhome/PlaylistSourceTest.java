@@ -8,7 +8,7 @@ public class PlaylistSourceTest {
     private static final String PLAYLIST = "#EXTM3U\n"
             + "#EXTINF:-1 tvg-logo=\"https://cdn.example/a.png\" group-title=\"Sports\",AFL 24/7 | HD\n"
             + "https://nas.example/live/afl.m3u8\n"
-            + "#EXTINF:-1,ABC News\n"
+            + "#EXTINF:-1 tvg-logo=\"data:image/png;base64,bad\",ABC News\n"
             + "http://nas.example/live/abc.ts\n"
             + "#EXTINF:-1 group-title=\"News\",\n"
             + "http://nas.example/live/nameless.ts\n"
@@ -27,6 +27,18 @@ public class PlaylistSourceTest {
         assertEquals("https://nas.example/live/afl.m3u8", cards.get(0).id);
         assertEquals(MediaCard.Kind.LIVE, cards.get(0).kind);
         assertEquals(MediaCard.State.AVAILABLE, cards.get(0).state);
+    }
+
+    @Test public void parsesTvgLogoAsArtUrl() {
+        List<MediaCard> cards = PlaylistSource.parse(PLAYLIST, 64);
+        assertEquals("https://cdn.example/a.png", cards.get(0).artUrl);
+        assertEquals("https://cdn.example/z.png", cards.get(3).artUrl);
+    }
+
+    @Test public void channelsWithoutLogoHaveNoArt() {
+        List<MediaCard> cards = PlaylistSource.parse(PLAYLIST, 64);
+        assertEquals("", cards.get(1).artUrl); // Non-URL logo must not be fetched.
+        assertEquals("", cards.get(2).artUrl);
     }
 
     @Test public void namelessChannelFallsBackToBoundedUrlName() {

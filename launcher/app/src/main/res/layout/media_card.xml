@@ -1,55 +1,77 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    android:layout_width="260dp"
-    android:layout_height="150dp"
-    android:layout_margin="12dp"
-    android:orientation="vertical"
-    android:padding="20dp"
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="110dp"
+    android:layout_height="165dp"
+    android:layout_marginHorizontal="12dp"
+    android:layout_marginVertical="8dp"
     android:background="@drawable/input_row_bg"
+    android:foreground="@drawable/media_card_focus"
     android:focusable="true"
     android:clickable="true"
-    android:gravity="bottom"
     android:clipChildren="false"
     android:clipToPadding="false">
 
-    <View
-        android:id="@+id/cardAccent"
-        android:layout_width="3dp"
-        android:layout_height="40dp"
-        android:layout_marginBottom="8dp"
+    <ImageView
+        android:id="@+id/cardArt"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:scaleType="centerCrop"
         android:visibility="gone" />
 
-    <TextView
-        android:id="@+id/cardState"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:textSize="11sp"
-        android:fontFamily="@string/font_medium"
-        android:letterSpacing="0.08"
-        android:textColor="#99FFFFFF"
-        android:textAllCaps="true"
-        android:singleLine="true" />
+    <View
+        android:id="@+id/cardScrim"
+        android:layout_width="match_parent"
+        android:layout_height="72dp"
+        android:layout_gravity="bottom"
+        android:background="@drawable/media_card_scrim"
+        android:visibility="gone" />
 
-    <TextView
-        android:id="@+id/cardTitle"
+    <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="4dp"
-        android:textSize="20sp"
-        android:fontFamily="@string/font_light"
-        android:textColor="#FFFFFFFF"
-        android:singleLine="true"
-        android:ellipsize="end" />
+        android:layout_gravity="bottom"
+        android:orientation="vertical"
+        android:padding="12dp">
 
-    <TextView
-        android:id="@+id/cardLine"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="2dp"
-        android:textSize="12sp"
-        android:fontFamily="@string/font_body"
-        android:textColor="#99FFFFFF"
-        android:singleLine="true"
-        android:ellipsize="end" />
+        <View
+            android:id="@+id/cardAccent"
+            android:layout_width="3dp"
+            android:layout_height="40dp"
+            android:layout_marginBottom="8dp"
+            android:visibility="gone" />
 
-</LinearLayout>
+        <TextView
+            android:id="@+id/cardState"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textSize="11sp"
+            android:fontFamily="@string/font_medium"
+            android:letterSpacing="0.08"
+            android:textColor="#99FFFFFF"
+            android:textAllCaps="true"
+            android:singleLine="true" />
+
+        <TextView
+            android:id="@+id/cardTitle"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:textSize="14sp"
+            android:fontFamily="@string/font_light"
+            android:textColor="#FFFFFFFF"
+            android:singleLine="true"
+            android:ellipsize="end" />
+
+        <TextView
+            android:id="@+id/cardLine"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="2dp"
+            android:textSize="12sp"
+            android:fontFamily="@string/font_body"
+            android:textColor="#99FFFFFF"
+            android:singleLine="true"
+            android:ellipsize="end" />
+
+    </LinearLayout>
+</FrameLayout>

@@ -197,6 +197,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
     private GameDay gameDay;
     private MediaSettings mediaSettings;
     private MediaLoader mediaLoader;
+    private PosterLoader posterLoader;
     private View raceBar;
     private LinearLayout racePager;
     private long rotationStart;
@@ -542,14 +543,17 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         gameDay = GameDay.create(this, cfg.gameDay, handler, this::updatePanel);
         mediaSettings = MediaSettings.read(this);
         if (mediaSettings.anySource()) {
+            posterLoader = new PosterLoader();
             mediaLoader = MediaLoader.create(this, mediaSettings, handler, snapshot -> {
                 MediaBand band = (MediaBand) findViewById(R.id.mediaBand);
                 boolean was = band.getVisibility() == View.VISIBLE;
                 band.apply(snapshot);
                 // The band and the race panel trade that space: re-decide the panel the moment the band flips.
                 if (was != (band.getVisibility() == View.VISIBLE)) updatePanel();
+                aimTopButtons(band.getVisibility() == View.VISIBLE);
             });
             ((MediaBand) findViewById(R.id.mediaBand)).setHost(this::openMediaCard);
+            ((MediaBand) findViewById(R.id.mediaBand)).setPosterLoader(posterLoader);
         }
         // The rotation runs on the clock that never jumps: setting the TV's time must not stall or stretch a turn.
         rotationStart = SystemClock.elapsedRealtime();
@@ -689,6 +693,10 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
             if (singleRow && !cfg.alwaysShowNames) want += (int) (29 * density);
             if (grid.getPaddingTop() != want) {
                 grid.setPadding(grid.getPaddingLeft(), want, grid.getPaddingRight(), grid.getPaddingBottom());
+                // The layout request made from inside this layout pass is dropped, so the grid would keep
+                // laying out children at the stale padding until some other event relayouts it — with no
+                // room left, as when the media band takes height back, that means no children at all.
+                grid.post(grid::requestLayout);
                 // A vertical grid parks the dock on the new padding line by scrolling (onTileFocused); a sideways
                 // row cannot scroll vertically, and the layout request made from inside this layout pass is
                 // dropped, so lay the row out again on the next frame. The glass and the title were placed for the
@@ -865,6 +873,8 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
             if (event.getAction() != KeyEvent.ACTION_DOWN) return false;
             if (keyCode == KeyEvent.KEYCODE_DPAD_UP) return true;
             if (keyCode == KeyEvent.KEYCODE_DPAD_DOWN) {
+                // With the band up, the aimed tab rail (aimTopButtons) must get this key, not the dock return.
+                if (((MediaBand) findViewById(R.id.mediaBand)).getVisibility() == View.VISIBLE) return false;
                 // Back to the dock tile Up came from, not wherever the focus finder lands.
                 focusTile(singleRow ? lastFocused : lastFocused % COLUMNS);
                 return true;
@@ -1303,11 +1313,23 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         }
     }
 
+    /** The first DOWN from any top pill enters the tab rail only while the band has content. */
+    private void aimTopButtons(boolean bandVisible) {
+        int target = bandVisible ? R.id.tabMovies : R.id.grid;
+        findViewById(R.id.btnInputs).setNextFocusDownId(target);
+        findViewById(R.id.btnWifi).setNextFocusDownId(target);
+        findViewById(R.id.btnVpn).setNextFocusDownId(target);
+        findViewById(R.id.btnReorder).setNextFocusDownId(target);
+        findViewById(R.id.btnLibraryTop).setNextFocusDownId(target);
+        findViewById(R.id.btnSettings).setNextFocusDownId(target);
+    }
+
     @Override
     protected void onDestroy() {
         super.onDestroy();
         if (gameDay != null) gameDay.shutdown();
         if (mediaLoader != null) mediaLoader.shutdown();
+        if (posterLoader != null) posterLoader.shutdown();
         unregisterReceiver(packageReceiver);
         wallpaperPlayer.close();
         ConnectivityManager cm = getSystemService(ConnectivityManager.class);

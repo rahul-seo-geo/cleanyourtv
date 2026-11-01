@@ -75,6 +75,39 @@ public class SeerrSourceTest {
         assertTrue(series.get(0).whenMs > 0);
     }
 
+    @Test public void upcomingCardsCarryTmdbPosterUrl() {
+        List<MediaCard> cards = SeerrSource.parseUpcoming(json("{\"results\":[{\"title\":\"Film\","
+                + "\"posterPath\":\"/jzPwsojjFStf5lR5Nm07w2hH56G.jpg\"}]}"), MediaCard.Kind.MOVIE);
+        assertEquals("https://image.tmdb.org/t/p/w342/jzPwsojjFStf5lR5Nm07w2hH56G.jpg",
+                cards.get(0).artUrl);
+    }
+
+    @Test public void upcomingWithoutPosterHasNoArt() {
+        List<MediaCard> cards = SeerrSource.parseUpcoming(json("{\"results\":[{\"title\":\"Absent\"},"
+                + "{\"title\":\"Null\",\"posterPath\":null},"
+                + "{\"title\":\"String null\",\"posterPath\":\"null\"}]}"), MediaCard.Kind.MOVIE);
+        for (MediaCard card : cards) assertEquals("", card.artUrl);
+    }
+
+    @Test public void detailUrlBuildsMovieAndTvPaths() {
+        assertEquals("https://seerr.example/api/v1/movie/550",
+                SeerrSource.detailUrl("https://seerr.example", MediaCard.Kind.MOVIE, "550"));
+        assertEquals("https://seerr.example/api/v1/tv/1399",
+                SeerrSource.detailUrl("https://seerr.example", MediaCard.Kind.SERIES, "1399"));
+    }
+
+    @Test public void parsePosterReadsDetailBody() {
+        assertEquals("https://image.tmdb.org/t/p/w342/a.jpg",
+                SeerrSource.parsePoster(json("{\"posterPath\":\"/a.jpg\"}")));
+    }
+
+    @Test public void parsePosterDefensiveOnGarbage() {
+        assertEquals("", SeerrSource.parsePoster(json("[]")));
+        assertEquals("", SeerrSource.parsePoster(null));
+        assertEquals("", SeerrSource.parsePoster(json("garbage")));
+        assertEquals("", SeerrSource.parsePoster(json("{\"posterPath\":\"relative.jpg\"}")));
+    }
+
     @Test public void urlsAndHeadersMatchNewsAddonContract() {
         assertEquals("https://seerr.example/api/v1/request", SeerrSource.requestsUrl("https://seerr.example"));
         assertEquals("https://seerr.example/api/v1/discover/movies/upcoming",

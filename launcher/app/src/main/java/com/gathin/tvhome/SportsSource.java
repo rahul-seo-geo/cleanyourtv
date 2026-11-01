@@ -21,7 +21,7 @@ final class SportsSource {
         for (GameDay.Turn turn : sorted) {
             if (cards.size() >= MAX_FIXTURES) break;
             cards.add(new MediaCard(turn.topLine + "|" + turn.startMs, MediaCard.Kind.SPORTS,
-                    turn.topLine, turn.word, phase(turn, nowMs), turn.startMs, turn.colour, "", ""));
+                    turn.topLine, turn.word, phase(turn, nowMs), turn.startMs, turn.colour, "", "", ""));
         }
         return cards;
     }

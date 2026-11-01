@@ -13,6 +13,8 @@ import java.util.concurrent.RejectedExecutionException;
 import java.util.function.LongSupplier;
 
 final class MediaLoader {
+    private static final int MAX_POSTER_DETAILS = 8;
+
     interface Fetcher { byte[] get(String url, Map<String, String> headers); }
     interface Store { byte[] read(String key); void put(String key, byte[] value); long ageSeconds(String key); }
     interface Sports { List<GameDay.Turn> turns(); }
@@ -185,6 +187,26 @@ final class MediaLoader {
             if (!fresh && !cards.isEmpty()) cached = true;
             for (MediaCard card : cards) {
                 (card.kind == MediaCard.Kind.SERIES ? series : movies).add(card);
+            }
+        }
+        // Request-card detail art is a best-effort decoration, never a source of freshness or stored payloads.
+        // Upcoming cards already had their poster chance in discover; only requests use the eight-fetch budget.
+        // Movies go first, then series, and a failed detail leaves the original card untouched.
+        int details = 0;
+        for (List<MediaCard> cards : List.of(movies, series)) {
+            for (int i = 0; i < cards.size() && details < MAX_POSTER_DETAILS; i++) {
+                MediaCard card = cards.get(i);
+                if (card.state == MediaCard.State.UPCOMING || !card.artUrl.isEmpty()
+                        || card.tmdbId.isEmpty()) continue;
+                details++;
+                try {
+                    byte[] body = fetcher.get(SeerrSource.detailUrl(base, card.kind, card.tmdbId), headers);
+                    String art = body == null ? "" : SeerrSource.parsePoster(body);
+                    if (!art.isEmpty()) cards.set(i, new MediaCard(card.id, card.kind, card.title,
+                            card.line, card.state, card.whenMs, card.accent, card.tmdbId, card.streamUrl, art));
+                } catch (Exception ignored) {
+                    // The detail service must not interrupt a snapshot even if a fetcher throws.
+                }
             }
         }
         statuses.put("seerr", new MediaSnapshot.SourceState(fresh

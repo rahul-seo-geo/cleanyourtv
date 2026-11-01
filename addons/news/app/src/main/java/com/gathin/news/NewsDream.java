@@ -13,7 +13,7 @@ public final class NewsDream extends DreamService {
     private final Handler handler = new Handler(Looper.getMainLooper());
     private Thread loader;
     private Cache cache;
-    private DashboardSnapshot dashboardSnapshot;
+    private volatile DashboardSnapshot dashboardSnapshot;
     private DashboardView dashboard;
     private boolean active;
     private final Runnable tick = new Runnable() {

@@ -65,7 +65,7 @@ final class SeerrSource {
         switch (code) {
             case 1: return MediaCard.State.REQUESTED;
             case 2: return MediaCard.State.APPROVED;
-            case 3: return MediaCard.State.AVAILABLE;
+            case 5: return MediaCard.State.AVAILABLE;
             default: return MediaCard.State.UNAVAILABLE;
         }
     }

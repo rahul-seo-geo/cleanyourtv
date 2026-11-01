@@ -10,9 +10,9 @@ public class SeerrSourceTest {
 
     private static final String REQUESTS = "["
             + "{\"id\":1,\"status\":2,\"media\":{\"mediaType\":\"movie\",\"tmdbId\":550,\"title\":\"Fight Club\"}},"
-            + "{\"id\":2,\"status\":3,\"media\":{\"mediaType\":\"tv\",\"tmdbId\":1399,\"title\":\"Game of Thrones\"}},"
+            + "{\"id\":2,\"status\":5,\"media\":{\"mediaType\":\"tv\",\"tmdbId\":1399,\"title\":\"Game of Thrones\"}},"
             + "{\"id\":3,\"status\":1,\"media\":{\"mediaType\":\"movie\",\"tmdbId\":680,\"title\":\"Pulp Fiction\"}},"
-            + "{\"id\":4,\"status\":9,\"media\":{\"mediaType\":\"tv\",\"tmdbId\":0}}"
+            + "{\"id\":4,\"status\":3,\"media\":{\"mediaType\":\"tv\",\"tmdbId\":0}}"
             + "]";
 
     @Test public void splitsRequestsIntoMoviesAndSeriesWithStates() {
@@ -37,7 +37,7 @@ public class SeerrSourceTest {
 
     @Test public void acceptsPagedRequestsWrapper() {
         String body = "{\"pageInfo\":{\"page\":1,\"results\":1},\"results\":["
-                + "{\"id\":9,\"status\":3,\"media\":{\"mediaType\":\"movie\",\"tmdbId\":157336}}"
+                + "{\"id\":9,\"status\":5,\"media\":{\"mediaType\":\"movie\",\"tmdbId\":157336}}"
                 + "]}";
         List<MediaCard> cards = SeerrSource.parseRequests(json(body));
         assertEquals(1, cards.size());

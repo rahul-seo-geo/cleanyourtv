@@ -27,6 +27,7 @@ public final class MediaBand extends LinearLayout {
         super(context, attrs);
         setOrientation(VERTICAL);
         setVisibility(GONE);
+        LayoutInflater.from(context).inflate(R.layout.media_band, this, true);
     }
 
     public void setHost(Host host) { this.host = host; }

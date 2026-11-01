@@ -542,8 +542,13 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         gameDay = GameDay.create(this, cfg.gameDay, handler, this::updatePanel);
         mediaSettings = MediaSettings.read(this);
         if (mediaSettings.anySource()) {
-            mediaLoader = MediaLoader.create(this, mediaSettings, handler,
-                    snapshot -> ((MediaBand) findViewById(R.id.mediaBand)).apply(snapshot));
+            mediaLoader = MediaLoader.create(this, mediaSettings, handler, snapshot -> {
+                MediaBand band = (MediaBand) findViewById(R.id.mediaBand);
+                boolean was = band.getVisibility() == View.VISIBLE;
+                band.apply(snapshot);
+                // The band and the race panel trade that space: re-decide the panel the moment the band flips.
+                if (was != (band.getVisibility() == View.VISIBLE)) updatePanel();
+            });
             ((MediaBand) findViewById(R.id.mediaBand)).setHost(this::openMediaCard);
         }
         // The rotation runs on the clock that never jumps: setting the TV's time must not stall or stretch a turn.
@@ -682,10 +687,6 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
             // A single row never shows the names under its tiles (the title above the row names the app), so the
             // 7dp gap and 22dp label item_app.xml keeps for them would only lift the row: sit it that much lower.
             if (singleRow && !cfg.alwaysShowNames) want += (int) (29 * density);
-            // The media band sits above the dock; with it shown, the dock parks 20dp lower so the band's
-            // cards and the dock row read as two shelves. The room comes out of BOTTOM_ROOM_DP.
-            if (MainActivity.this.dockRow && findViewById(R.id.mediaBand).getVisibility() == View.VISIBLE)
-                want += (int) (20 * density);
             if (grid.getPaddingTop() != want) {
                 grid.setPadding(grid.getPaddingLeft(), want, grid.getPaddingRight(), grid.getPaddingBottom());
                 // A vertical grid parks the dock on the new padding line by scrolling (onTileFocused); a sideways
@@ -2639,6 +2640,12 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
 
     private static final int RACE_RED = 0xFFFF3B2F;
 
+    /** While the media band is up its cards take this space (kickoff data lives in the SPORTS tab). */
+    private boolean mediaBandShown() {
+        View band = findViewById(R.id.mediaBand);
+        return band != null && band.getVisibility() == View.VISIBLE;
+    }
+
     /**
      * Shows or hides the race-weekend panel for this minute. Text only, set once a minute with the clock:
      * nothing animates, so the panel costs the GPU nothing between ticks.
@@ -2693,7 +2700,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
             }
             // No session times for a game: the line takes no room, so the dots sit under the countdown.
             raceSessions.setVisibility(View.GONE);
-            racePanel.setVisibility(View.VISIBLE);
+            racePanel.setVisibility(mediaBandShown() ? View.GONE : View.VISIBLE);
         }
         showPager(turns.size(), on);
         if (turns.size() > 1 && !stopped) handler.postDelayed(turnTick, GameDay.delayToNextTurn(since, seconds));
@@ -2766,7 +2773,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
             row.setSpan(new android.text.style.ForegroundColorSpan(color), start, row.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
         }
         raceSessions.setText(row);
-        racePanel.setVisibility(View.VISIBLE);
+        racePanel.setVisibility(mediaBandShown() ? View.GONE : View.VISIBLE);
     }
 
     private void refreshPillsAfterNextDraw() {

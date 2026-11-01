@@ -25,6 +25,8 @@ final class DashboardLoader {
             "https://feeds.bbci.co.uk/sport/football/teams/arsenal/rss.xml",
             "https://feeds.bbci.co.uk/sport/football/teams/real-madrid/rss.xml"};
     private static final String[] DEFAULT_NAMES = {"ABC News", "BBC News", "Arsenal", "Real Madrid"};
+    private static final long STORY_MAX_AGE_MS = 24L * 60 * 60 * 1000;
+    private static final DashboardSlots.Policy STORY_POLICY = new DashboardSlots.Policy(6, STORY_MAX_AGE_MS);
     private final Fetcher fetcher;
     private final Store store;
     private final Games games;
@@ -47,16 +49,21 @@ final class DashboardLoader {
             int separator = value.indexOf('|');
             if (separator <= 0) continue;
             String name = value.substring(separator + 1).trim();
-            byte[] response = fetcher.get(value.substring(0, separator).trim(), Collections.emptyMap());
+            String url = value.substring(0, separator).trim();
+            String identityKey = key + "-url";
+            boolean sameSource = url.equals(readIdentity(identityKey));
+            byte[] response = fetcher.get(url, Collections.emptyMap());
             List<Feeds.Item> items = parseFeed(response);
             boolean fresh = !items.isEmpty();
-            if (fresh) store.put(key, response);
-            else items = parseFeed(store.read(key));
-            long updated = fresh ? nowMs : cachedTime(key, previous, nowMs);
+            if (fresh) {
+                store.put(key, response);
+                store.put(identityKey, url.getBytes(StandardCharsets.UTF_8));
+            } else if (sameSource) items = parseFeed(store.read(key));
+            long updated = fresh ? nowMs : sameSource ? cachedTime(key, previous, nowMs) : 0;
             if (items.isEmpty() && !fresh) {
-                List<DashboardSnapshot.StorySlot> retained = priorStories(previous, name, kind(name));
-                if (previousStatus(previous, key) > 0) {
-                    for (DashboardSnapshot.StorySlot slot : retained) candidates.add(stale(slot));
+                if (sameSource && previousStatus(previous, key) > 0) {
+                    for (DashboardSnapshot.StorySlot slot : priorStories(previous, name, kind(name)))
+                        candidates.add(stale(slot));
                     updated = previousStatus(previous, key);
                 } else updated = 0;
             } else {
@@ -80,13 +87,16 @@ final class DashboardLoader {
             addMedia(previous, statuses, candidates, "upcoming-tv", "Upcoming series",
                     DashboardSnapshot.ContentKind.UPCOMING_SERIES, base + "/api/v1/discover/tv/upcoming", headers, nowMs);
         }
-        GameDayReader.GameDayResult result = games.read(settings.get("game_day"), nowMs);
+        String provider = settings.get("game_day").trim();
+        GameDayReader.GameDayResult result = games.read(provider, nowMs);
+        boolean sameProvider = !provider.isEmpty() && provider.equals(readIdentity("game_day-provider"));
         List<DashboardSnapshot.MatchSlot> matches = new ArrayList<>();
         if (result != null && result.state != GameDayReader.State.UNAVAILABLE) {
             matches.addAll(result.matches);
+            if (!provider.isEmpty()) store.put("game_day-provider", provider.getBytes(StandardCharsets.UTF_8));
             statuses.put("game_day", new DashboardSnapshot.SourceStatus(DashboardSnapshot.Freshness.FRESH, nowMs, false));
         } else {
-            if (previous != null) for (DashboardSnapshot.MatchSlot match : previous.matches) {
+            if (sameProvider && previous != null) for (DashboardSnapshot.MatchSlot match : previous.matches) {
                 if (match.endMs <= nowMs) continue;
                 matches.add(new DashboardSnapshot.MatchSlot(match.fixtureKey, match.topLine,
                         match.phase == DashboardSnapshot.MatchPhase.LIVE ? DashboardSnapshot.MatchPhase.UNAVAILABLE : match.phase,
@@ -97,8 +107,7 @@ final class DashboardLoader {
                     ? DashboardSnapshot.Freshness.UNAVAILABLE : DashboardSnapshot.Freshness.STALE, updated, !matches.isEmpty()));
         }
         List<DashboardSnapshot.StorySlot> slots = DashboardSlots.reconcile(
-                previous == null ? List.of() : previous.stories, candidates, nowMs,
-                new DashboardSlots.Policy(6, Long.MAX_VALUE));
+                previous == null ? List.of() : previous.stories, candidates, nowMs, STORY_POLICY);
         return new DashboardSnapshot(slots, matches, statuses);
     }
 
@@ -108,9 +117,14 @@ final class DashboardLoader {
         byte[] response = fetcher.get(url, headers);
         JSONArray entries = results(response);
         boolean fresh = entries != null;
+        String cacheHit = cacheKey;
         if (fresh) store.put(cacheKey, response);
-        else entries = results(store.read(cacheKey));
-        long updated = fresh ? nowMs : cachedTime(cacheKey, previous, nowMs);
+        else {
+            entries = results(store.read(cacheKey));
+            if (entries == null && (entries = legacyEntries(store.read("upcoming"), kind)) != null)
+                cacheHit = "upcoming";
+        }
+        long updated = fresh ? nowMs : cachedTime(cacheHit, previous, nowMs);
         if (entries != null) {
             try {
                 JSONObject combined = new JSONObject();
@@ -134,6 +148,14 @@ final class DashboardLoader {
         catch (Exception ignored) { return null; }
     }
 
+    private static JSONArray legacyEntries(byte[] bytes, DashboardSnapshot.ContentKind kind) {
+        if (bytes == null) return null;
+        try {
+            return new JSONObject(new String(bytes, StandardCharsets.UTF_8))
+                    .optJSONArray(kind == DashboardSnapshot.ContentKind.UPCOMING_MOVIE ? "movies" : "tv");
+        } catch (Exception ignored) { return null; }
+    }
+
     private static List<Feeds.Item> parseFeed(byte[] bytes) {
         if (bytes == null) return List.of();
         try { return Feeds.parse(new ByteArrayInputStream(bytes)); }
@@ -144,6 +166,11 @@ final class DashboardLoader {
         long age = store.ageSeconds(key);
         if (age >= 0) return Math.max(1, nowMs - age * 1000);
         return previousStatus(previous, key);
+    }
+
+    String readIdentity(String key) {
+        byte[] stored = store.read(key);
+        return stored == null ? null : new String(stored, StandardCharsets.UTF_8);
     }
 
     private static long previousStatus(DashboardSnapshot previous, String key) {

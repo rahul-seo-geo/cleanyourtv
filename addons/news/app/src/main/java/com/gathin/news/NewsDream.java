@@ -101,7 +101,7 @@ public final class NewsDream extends DreamService {
         });
     }
 
-    private byte[] fetchCached(String cacheKey, String url, Map<String, String> headers) {
+    private byte[] fetchPoster(String cacheKey, String url, Map<String, String> headers) {
         if (Thread.currentThread().isInterrupted()) return cache.read(cacheKey);
         byte[] data = Fetch.get(url, headers);
         if (data != null) cache.put(cacheKey, data);
@@ -153,7 +153,7 @@ public final class NewsDream extends DreamService {
             next.addView(poster, posterParams);
             String posterUrl = slide.posterUrl;
             posters.execute(() -> {
-                byte[] bytes = fetchCached("poster-" + Integer.toHexString(posterUrl.hashCode()), posterUrl, Collections.emptyMap());
+                byte[] bytes = fetchPoster("poster-" + Integer.toHexString(posterUrl.hashCode()), posterUrl, Collections.emptyMap());
                 if (bytes != null) {
                     android.graphics.Bitmap bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.length);
                     if (bitmap != null) handler.post(() -> { if (active && next == current) poster.setImageBitmap(bitmap); });

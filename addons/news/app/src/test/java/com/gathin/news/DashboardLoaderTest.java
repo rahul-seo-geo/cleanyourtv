@@ -24,13 +24,17 @@ public class DashboardLoaderTest {
     }
 
     private static byte[] rss(String title) {
+        return rss(title, "Fri, 15 Jan 2027 06:00:00 GMT");
+    }
+
+    private static byte[] rss(String title, String pubDate) {
         return ("<rss><channel><item><title>" + title + "</title><link>https://example.com/" + title
-                + "</link><pubDate>Tue, 14 Nov 2023 22:13:20 GMT</pubDate></item></channel></rss>")
+                + "</link><pubDate>" + pubDate + "</pubDate></item></channel></rss>")
                 .getBytes(StandardCharsets.UTF_8);
     }
 
     private static byte[] media(String title) {
-        return ("{\"results\":[{\"title\":\"" + title + "\",\"releaseDate\":\"2027-01-01\"}]}")
+        return ("{\"results\":[{\"title\":\"" + title + "\",\"releaseDate\":\"2027-01-15\"}]}")
                 .getBytes(StandardCharsets.UTF_8);
     }
 
@@ -44,6 +48,7 @@ public class DashboardLoaderTest {
     @Test public void mixedSourcesRefreshIndependentlyAndFailedFeedRetainsCache() {
         responses.put("https://abc", rss("Fresh ABC"));
         cached.put("feed2", rss("Cached BBC"));
+        cached.put("feed2-url", "https://bbc".getBytes(StandardCharsets.UTF_8));
         ages.put("feed2", 120L);
         responses.put("https://seerr/api/v1/discover/movies/upcoming", media("Fresh movie"));
         Settings settings = Settings.parse("feed1=https://abc|ABC News\nfeed2=https://bbc|BBC News\n"
@@ -64,6 +69,7 @@ public class DashboardLoaderTest {
 
     @Test public void subsequentSuccessReplacesStaleItemWithoutMovingOtherIdentity() {
         cached.put("feed1", rss("Old ABC"));
+        cached.put("feed1-url", "https://abc".getBytes(StandardCharsets.UTF_8));
         ages.put("feed1", 3600L);
         responses.put("https://bbc", rss("BBC"));
         Settings settings = Settings.parse("feed1=https://abc|ABC News\nfeed2=https://bbc|BBC News");
@@ -101,6 +107,55 @@ public class DashboardLoaderTest {
         assertEquals(DashboardSnapshot.Freshness.STALE, next.matches.get(0).freshness);
         assertNotEquals(DashboardSnapshot.MatchPhase.LIVE, next.matches.get(0).phase);
         assertNull(next.matches.get(0).scoreOrCountdown);
+    }
+
+    @Test public void expiredStoriesAreExcludedEvenWhenSourceRefreshSucceeds() {
+        responses.put("https://abc", rss("Old news", "Tue, 14 Nov 2023 22:13:20 GMT"));
+        responses.put("https://seerr/api/v1/discover/movies/upcoming",
+                "{\"results\":[{\"title\":\"Old movie\",\"releaseDate\":\"2024-01-01\"}]}"
+                        .getBytes(StandardCharsets.UTF_8));
+        DashboardSnapshot snapshot = loader().load(null, Settings.parse("feed1=https://abc|ABC News\n"
+                + "jellyseerr_url=https://seerr\njellyseerr_key=secret"), NOW);
+        for (DashboardSnapshot.StorySlot slot : snapshot.stories) assertTrue(slot.isVacant());
+    }
+
+    @Test public void changingFeedUrlRejectsOldCacheAndPreviousSnapshot() {
+        responses.put("https://abc", rss("Old ABC"));
+        DashboardLoader loader = loader();
+        DashboardSnapshot prior = loader.load(null, Settings.parse("feed1=https://abc|ABC News"), NOW);
+        DashboardSnapshot changed = loader.load(prior,
+                Settings.parse("feed1=https://different|ABC News"), NOW + 1000);
+        assertEquals(DashboardSnapshot.Freshness.UNAVAILABLE, changed.sources.get("feed1").freshness);
+        for (DashboardSnapshot.StorySlot slot : changed.stories) assertNotEquals("Old ABC", slot.title);
+        assertEquals("https://abc", new String(cached.get("feed1-url"), StandardCharsets.UTF_8));
+    }
+
+    @Test public void changingGameDayProviderOrRemovingItNeverRetainsOldMatches() {
+        games = new GameDayReader.GameDayResult(GameDayReader.State.AVAILABLE,
+                List.of(new DashboardSnapshot.MatchSlot("fixture", "Match", DashboardSnapshot.MatchPhase.LIVE,
+                        "1-0", NOW - 1000, NOW + 100_000, 0xff000000, DashboardSnapshot.Freshness.FRESH)), 30);
+        DashboardLoader loader = loader();
+        DashboardSnapshot prior = loader.load(null, Settings.parse("game_day=com.example.old"), NOW);
+        games = new GameDayReader.GameDayResult(GameDayReader.State.UNAVAILABLE, List.of(), 30);
+        for (String configured : List.of("game_day=com.example.new", "game_day=")) {
+            DashboardSnapshot next = loader.load(prior, Settings.parse(configured), NOW + 1000);
+            assertEquals(DashboardSnapshot.Freshness.UNAVAILABLE, next.sources.get("game_day").freshness);
+            assertTrue(next.matches.isEmpty());
+        }
+    }
+
+    @Test public void legacyCombinedSeerrCacheRestoresBothKindsWhenOffline() {
+        cached.put("upcoming", ("{\"movies\":[{\"title\":\"Legacy movie\",\"releaseDate\":\"2027-01-15\"}],"
+                + "\"tv\":[{\"name\":\"Legacy series\",\"firstAirDate\":\"2027-01-15\"}]}")
+                .getBytes(StandardCharsets.UTF_8));
+        ages.put("upcoming", 120L);
+        DashboardSnapshot snapshot = loader().load(null,
+                Settings.parse("jellyseerr_url=https://seerr\njellyseerr_key=secret"), NOW);
+        assertTrue(story(snapshot, "Legacy movie").cached);
+        assertEquals(DashboardSnapshot.ContentKind.UPCOMING_SERIES,
+                story(snapshot, "Legacy series").contentKind);
+        assertEquals(DashboardSnapshot.Freshness.STALE, snapshot.sources.get("upcoming-movies").freshness);
+        assertEquals(NOW - 120_000, snapshot.sources.get("upcoming-tv").updatedMs);
     }
 
     @Test public void unconfiguredGameDayIsUnavailableWithoutReusingMatchData() {

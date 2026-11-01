@@ -17,7 +17,7 @@ public final class MediaBand extends LinearLayout {
     public interface Host { void openCard(MediaCard card); }
 
     private static final MediaCard.Kind[] ORDER =
-            {MediaCard.Kind.MOVIE, MediaCard.Kind.SERIES, MediaCard.Kind.SPORTS, MediaCard.Kind.LIVE};
+            {MediaCard.Kind.MOVIE, MediaCard.Kind.SERIES, MediaCard.Kind.SPORTS};
 
     private Host host;
     private PosterLoader posters;
@@ -48,13 +48,12 @@ public final class MediaBand extends LinearLayout {
         switch (ORDER[selected]) {
             case MOVIE: return snapshot.movies;
             case SERIES: return snapshot.series;
-            case SPORTS: return snapshot.sports;
-            default: return snapshot.live;
+            default: return snapshot.sports;
         }
     }
 
     private void bindRail() {
-        int[] tabIds = {R.id.tabMovies, R.id.tabSeries, R.id.tabSports, R.id.tabLive};
+        int[] tabIds = {R.id.tabMovies, R.id.tabSeries, R.id.tabSports};
         for (int i = 0; i < tabIds.length; i++) {
             final int idx = i;
             TextView tab = findViewById(tabIds[idx]);

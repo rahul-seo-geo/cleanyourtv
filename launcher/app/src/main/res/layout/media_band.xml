@@ -57,23 +57,6 @@
             android:paddingBottom="12dp"
             android:paddingStart="24dp"
             android:paddingEnd="24dp" />
-
-        <TextView
-            android:id="@+id/tabLive"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="@string/media_tab_live"
-            android:textSize="12sp"
-            android:fontFamily="@string/font_medium"
-            android:letterSpacing="0.22"
-            android:textAllCaps="true"
-            android:textColor="#66FFFFFF"
-            android:focusable="true"
-            android:clickable="true"
-            android:paddingTop="12dp"
-            android:paddingBottom="12dp"
-            android:paddingStart="24dp"
-            android:paddingEnd="24dp" />
     </LinearLayout>
 
     <HorizontalScrollView

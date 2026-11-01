@@ -27,18 +27,20 @@ final class MediaLoader {
     private final MediaSettings settings;
     private GameDay provider;
     private final long refreshMs;
+    private final String jellyUrl;
+    private final String jellyKey;
     private final ExecutorService io = Executors.newSingleThreadExecutor();
     private final Runnable refreshLoop = this::refresh;
     private MediaSnapshot last = MediaSnapshot.empty();
     private boolean running;
 
     MediaLoader(Fetcher fetcher, Store store, Sports sports, LongSupplier clock) {
-        this(fetcher, store, sports, clock, null, null, null, null, 15L * 60 * 1000);
+        this(fetcher, store, sports, clock, null, null, null, null, 15L * 60 * 1000, "", "");
     }
 
     private MediaLoader(Fetcher fetcher, Store store, Sports sports, LongSupplier clock,
                         MediaSettings settings, Handler main, Listener listener, GameDay provider,
-                        long refreshMs) {
+                        long refreshMs, String jellyUrl, String jellyKey) {
         this.fetcher = fetcher;
         this.store = store;
         this.sports = sports;
@@ -48,12 +50,15 @@ final class MediaLoader {
         this.listener = listener;
         this.provider = provider;
         this.refreshMs = refreshMs;
+        this.jellyUrl = jellyUrl;
+        this.jellyKey = jellyKey;
     }
 
     static MediaLoader create(Context context, MediaSettings settings, Handler main, Listener listener) {
         MediaLoader loader = new MediaLoader(new Fetch(), new MediaStore(context),
                 () -> List.of(), System::currentTimeMillis, settings, main, listener, null,
-                settings.refreshMinutes() * 60_000L);
+                settings.refreshMinutes() * 60_000L,
+                settings.get("jellyfin_url"), settings.get("jellyfin_key"));
         GameDay provider = GameDay.create(context, settings.get("game_day_pkg"), main,
                 loader::refreshOnProviderChange);
         loader.provider = provider;
@@ -84,6 +89,18 @@ final class MediaLoader {
         stop();
         if (provider != null) provider.shutdown();
         io.shutdownNow();
+    }
+
+    /** Off-thread Jellyfin resolution; callback fires on the main thread, null when unresolvable. */
+    void resolve(String tmdbId, java.util.function.Consumer<String> onResolved) {
+        try {
+            io.execute(() -> {
+                String id = JellyfinResolve.itemId(fetcher, jellyUrl, jellyKey, tmdbId);
+                main.post(() -> onResolved.accept(id));
+            });
+        } catch (RejectedExecutionException e) {
+            main.post(() -> onResolved.accept(null));
+        }
     }
 
     private void refresh() {

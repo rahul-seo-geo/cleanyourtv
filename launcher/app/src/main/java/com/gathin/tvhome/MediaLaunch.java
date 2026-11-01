@@ -10,7 +10,12 @@ final class MediaLaunch {
     private MediaLaunch() { }
 
     static void openItem(Context ctx, String jellyfinPackage, String itemId) {
-        if (itemId == null) return;
+        if (itemId == null) {
+            Intent home = jellyfinPackage.isEmpty()
+                    ? null : ctx.getPackageManager().getLaunchIntentForPackage(jellyfinPackage);
+            if (home != null) ctx.startActivity(home);
+            return;
+        }
         Intent deep = new Intent(Intent.ACTION_VIEW, Uri.parse("jellyfin://item/" + itemId));
         deep.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
         if (!jellyfinPackage.isEmpty()) deep.setPackage(jellyfinPackage);

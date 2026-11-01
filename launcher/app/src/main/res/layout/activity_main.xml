@@ -381,6 +381,17 @@
             </LinearLayout>
         </RelativeLayout>
 
+        <!-- Media dashboard (spec: docs/superpowers/specs/2026-11-01-media-dashboard-launcher-design.md).
+             GONE when no sources are configured; the dock and rows are untouched either way. -->
+        <com.gathin.tvhome.MediaBand
+            android:id="@+id/mediaBand"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="10dp"
+            android:layout_marginEnd="10dp"
+            android:layout_marginTop="10dp"
+            android:visibility="gone" />
+
         <!-- The wrapper clips at the grid's edge; the grid itself must not clip so scaled tiles can overflow their cells. -->
         <FrameLayout
             android:layout_width="match_parent"

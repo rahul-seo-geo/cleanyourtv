@@ -195,6 +195,8 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
     private TextView raceKicker, raceHeadline, raceSessions;
     /** game_day: each team's next game from an add-on, rotating in the race panel; null when the key is off. */
     private GameDay gameDay;
+    private MediaSettings mediaSettings;
+    private MediaLoader mediaLoader;
     private View raceBar;
     private LinearLayout racePager;
     private long rotationStart;
@@ -538,6 +540,12 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         raceBar = findViewById(R.id.raceBar);
         racePager = findViewById(R.id.racePager);
         gameDay = GameDay.create(this, cfg.gameDay, handler, this::updatePanel);
+        mediaSettings = MediaSettings.read(this);
+        if (mediaSettings.anySource()) {
+            mediaLoader = MediaLoader.create(this, mediaSettings, handler,
+                    snapshot -> ((MediaBand) findViewById(R.id.mediaBand)).apply(snapshot));
+            ((MediaBand) findViewById(R.id.mediaBand)).setHost(this::openMediaCard);
+        }
         // The rotation runs on the clock that never jumps: setting the TV's time must not stall or stretch a turn.
         rotationStart = SystemClock.elapsedRealtime();
         showStats = cfg.showStats;
@@ -1056,6 +1064,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         }
         if (showStats) startStats();
         if (gameDay != null) gameDay.start();
+        if (mediaLoader != null) mediaLoader.start();
         sky.update();
         wallpaperPlayer.start();
         handler.postDelayed(minuteTick, MINUTE_MS);
@@ -1237,6 +1246,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         startPending = null;   // leaving Home before the network came back: the boot's app stays closed
         stopStats();
         if (gameDay != null) gameDay.stop();
+        if (mediaLoader != null) mediaLoader.stop();
         handler.removeCallbacks(turnTick);
         if (lamp != null) lamp.stop();
         cancelPendingFocusScroll();
@@ -1292,6 +1302,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
     protected void onDestroy() {
         super.onDestroy();
         if (gameDay != null) gameDay.shutdown();
+        if (mediaLoader != null) mediaLoader.shutdown();
         unregisterReceiver(packageReceiver);
         wallpaperPlayer.close();
         ConnectivityManager cm = getSystemService(ConnectivityManager.class);
@@ -3142,6 +3153,22 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         } catch (ActivityNotFoundException | SecurityException e) {
             Toast.makeText(this, R.string.not_available, Toast.LENGTH_SHORT).show();
         }
+    }
+
+    /** A band card: a live stream goes to the player, anything with a tmdbId resolves to a Jellyfin item,
+     *  and the rest just opens the Jellyfin app. */
+    private void openMediaCard(MediaCard card) {
+        if (card.kind == MediaCard.Kind.LIVE && !card.streamUrl.isEmpty()) {
+            MediaLaunch.playStream(this, mediaSettings.get("player_package"), card.streamUrl);
+            return;
+        }
+        if (!card.tmdbId.isEmpty() && mediaLoader != null) {
+            mediaLoader.resolve(card.tmdbId, itemId ->
+                    MediaLaunch.openItem(this, mediaSettings.get("jellyfin_package"), itemId));
+            return;
+        }
+        if (!mediaSettings.get("jellyfin_package").isEmpty())
+            MediaLaunch.openItem(this, mediaSettings.get("jellyfin_package"), null);
     }
 
     /** `input_sources` in config.xml or a theme: "HW5=23" maps the framework input whose id ends in /HW5 to a vendor

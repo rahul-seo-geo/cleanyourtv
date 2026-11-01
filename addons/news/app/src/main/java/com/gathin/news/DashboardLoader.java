@@ -168,7 +168,7 @@ final class DashboardLoader {
         return previousStatus(previous, key);
     }
 
-    String readIdentity(String key) {
+    private String readIdentity(String key) {
         byte[] stored = store.read(key);
         return stored == null ? null : new String(stored, StandardCharsets.UTF_8);
     }

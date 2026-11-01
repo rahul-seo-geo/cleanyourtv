@@ -97,6 +97,31 @@ and choose Module cards to change your mind. How to make one: [`docs/modules.md`
 contract: [`docs/specs/card.md`](specs/card.md). Ready-made ones are in [`addons/`](../addons/), and
 [cleanyour.tv/addons](https://cleanyour.tv/addons) shows the themes, switches and add-ons together.
 
+## Media dashboard
+
+The optional dashboard band reads `dashboard.txt` from the launcher's private storage. Copy
+[`launcher/dashboard.example.txt`](../launcher/dashboard.example.txt) to `launcher/dashboard.txt`, fill in
+only the sources you use, then run `TV_HOST=<tv address> ./launcher/setup.sh` (or
+`./launcher/setup.ps1 -TvHost <tv address>` in PowerShell) after installing the launcher. You can also
+pass a settings file path as the first argument. The scripts use `tools/venv`, `b64push.py`, and
+`tools/tv.py` to write through the launcher's content provider; they do not print the file values.
+`launcher/dashboard.txt` is gitignored and must not be committed. For builds with a custom
+`launcherApplicationId`, set it in `launcher/gradle.properties` or `launcher/local.properties` so the
+scripts address the installed package.
+
+| Setting | What it feeds | When blank |
+|---|---|---|
+| `seerr_url`, `seerr_key` | Seerr movies and series | No Seerr items |
+| `jellyfin_url`, `jellyfin_key` | Reserved for a Jellyfin connection; not consumed by the current dashboard | No effect |
+| `jellyfin_package` | Reserved for a Jellyfin app target; not consumed yet | No effect |
+| `player_package` | Reserved for a preferred player target; not consumed yet | No effect |
+| `m3u_url` | M3U playlist channels | No playlist channels |
+| `game_day_pkg` | Match-day provider add-on (the same package as `config.xml` `game_day`) | No match-day items |
+| `refresh_minutes` | Refresh while Home is visible | 15 minutes; values below 1 become 1 |
+
+With no source configured, the dashboard band stays hidden and Home works as before. On-device
+provider access and dashboard behavior are checked separately during TV verification.
+
 ## Clock screensaver
 
 Pick "Clock" in the TV's screensaver settings, or over ADB:

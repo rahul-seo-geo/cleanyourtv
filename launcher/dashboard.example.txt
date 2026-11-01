@@ -1,0 +1,13 @@
+# Media dashboard sources. Copy to dashboard.txt, fill in, push with setup.sh (TV_HOST=...).
+# dashboard.txt is gitignored; never commit it.
+seerr_url=
+seerr_key=
+jellyfin_url=
+jellyfin_key=
+jellyfin_package=
+player_package=
+m3u_url=
+# game_day_pkg is the same add-on package the race panel uses (config.xml game_day)
+game_day_pkg=
+# minutes between refreshes while Home is visible (default 15, minimum 1)
+refresh_minutes=

@@ -27,6 +27,23 @@ final class Slides {
 
     static void setSeerr(String url, String key) { seerrUrl = url.replaceAll("/+$", ""); seerrKey = key; }
 
+    static List<Slide> fromSnapshot(DashboardSnapshot snapshot) {
+        List<Slide> slides = new ArrayList<>();
+        for (DashboardSnapshot.StorySlot slot : snapshot.stories) {
+            if (slot.isVacant()) continue;
+            Slide slide = new Slide();
+            slide.kind = Kind.valueOf(slot.contentKind.name());
+            slide.title = slot.title;
+            slide.source = slot.source;
+            slide.dateMs = slot.publishedMs;
+            if (slide.kind == Kind.UPCOMING_MOVIE || slide.kind == Kind.UPCOMING_SERIES)
+                slide.posterUrl = slot.destinationUrl;
+            else slide.link = slot.destinationUrl;
+            slides.add(slide);
+        }
+        return slides;
+    }
+
     static List<Slide> merge(List<Feeds.Item> abc, List<Feeds.Item> bbc,
                              Map<String, List<Feeds.Item>> teamFeeds, String upcomingJson) {
         List<List<Slide>> sections = new ArrayList<>();

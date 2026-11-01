@@ -13,20 +13,15 @@ import android.view.ViewOutlineProvider;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.TextView;
-import java.io.ByteArrayInputStream;
-import java.nio.charset.StandardCharsets;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Date;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import org.json.JSONArray;
-import org.json.JSONObject;
 
 public final class NewsDream extends DreamService {
     private final Handler handler = new Handler(Looper.getMainLooper());
@@ -36,6 +31,7 @@ public final class NewsDream extends DreamService {
     private Thread loader;
     private ExecutorService posters;
     private Cache cache;
+    private DashboardSnapshot dashboardSnapshot;
     private List<Slides.Slide> slides = new ArrayList<>();
     private int index;
     private int interval = 18;
@@ -86,68 +82,23 @@ public final class NewsDream extends DreamService {
         Settings settings = Settings.read(this);
         try { interval = Math.max(8, Math.min(120, Integer.parseInt(settings.get("slide_seconds")))); }
         catch (NumberFormatException ignored) { interval = 18; }
-        String url = settings.get("jellyseerr_url"), key = settings.get("jellyseerr_key");
-        Slides.setSeerr(url, key);
-        List<String> feedKeys = settings.keysWithPrefix("feed");
-        boolean defaults = feedKeys.isEmpty();
-        if (defaults) feedKeys = List.of("feed1", "feed2", "feed3", "feed4");
-        String[] urls = {"https://www.abc.net.au/news/feed/51120/rss.xml",
-                "https://feeds.bbci.co.uk/news/rss.xml",
-                "https://feeds.bbci.co.uk/sport/football/teams/arsenal/rss.xml",
-                "https://feeds.bbci.co.uk/sport/football/teams/real-madrid/rss.xml"};
-        String[] names = {"ABC News", "BBC News", "Arsenal", "Real Madrid"};
-        List<Feeds.Item> abc = new ArrayList<>(), bbc = new ArrayList<>();
-        Map<String, List<Feeds.Item>> teams = new HashMap<>();
-        for (int i = 0; i < feedKeys.size() && !Thread.currentThread().isInterrupted(); i++) {
-            String feedKey = feedKeys.get(i);
-            String value = defaults ? urls[i] + "|" + names[i] : settings.get(feedKey);
-            int separator = value.indexOf('|');
-            if (separator <= 0) continue;
-            String name = value.substring(separator + 1).trim();
-            String feedUrl = value.substring(0, separator).trim();
-            byte[] data = Fetch.get(feedUrl, Collections.emptyMap());
-            List<Feeds.Item> items = parseFeed(data);
-            if (items.isEmpty()) items = parseFeed(cache.read(feedKey));
-            else cache.put(feedKey, data);
-            if ("ABC News".equals(name)) abc.addAll(items);
-            else if ("BBC News".equals(name)) bbc.addAll(items);
-            else teams.put(name, items);
-        }
-        String upcoming = null;
-        if (!url.isBlank() && !key.isBlank() && !Thread.currentThread().isInterrupted()) {
-            String base = url.replaceAll("/+$", "");
-            Map<String, String> headers = Map.of("X-Api-Key", key);
-            byte[] movies = fetchCached("upcoming-movies", base + "/api/v1/discover/movies/upcoming", headers);
-            byte[] tv = fetchCached("upcoming-tv", base + "/api/v1/discover/tv/upcoming", headers);
-            try {
-                if (movies != null || tv != null) {
-                    JSONObject both = new JSONObject();
-                    both.put("movies", movies == null ? new JSONArray() : new JSONObject(new String(movies, StandardCharsets.UTF_8)).optJSONArray("results"));
-                    both.put("tv", tv == null ? new JSONArray() : new JSONObject(new String(tv, StandardCharsets.UTF_8)).optJSONArray("results"));
-                    upcoming = both.toString();
-                    cache.put("upcoming", upcoming.getBytes(StandardCharsets.UTF_8));
-                }
-            } catch (Exception ignored) { }
-            if (upcoming == null) {
-                byte[] cached = cache.read("upcoming");
-                if (cached != null) upcoming = new String(cached, StandardCharsets.UTF_8);
-            }
-        }
-        List<Slides.Slide> loaded = Slides.merge(abc, bbc, teams, upcoming);
+        DashboardLoader dashboardLoader = new DashboardLoader(Fetch::get, new DashboardLoader.Store() {
+            @Override public byte[] read(String cacheKey) { return cache.read(cacheKey); }
+            @Override public void put(String cacheKey, byte[] data) { cache.put(cacheKey, data); }
+            @Override public long ageSeconds(String cacheKey) { return cache.ageSeconds(cacheKey); }
+        }, (pkg, nowMs) -> GameDayReader.read(this, nowMs));
+        DashboardSnapshot snapshot = dashboardLoader.load(dashboardSnapshot, settings, System.currentTimeMillis());
+        if (Thread.currentThread().isInterrupted()) return;
+        List<Slides.Slide> loaded = Slides.fromSnapshot(snapshot);
         handler.post(() -> {
             if (!active) return;
+            dashboardSnapshot = snapshot;
             if (!loaded.isEmpty()) slides = loaded;
             index = 0;
             show(0);
             handler.removeCallbacks(rotate);
             handler.postDelayed(rotate, interval * 1000L);
         });
-    }
-
-    private List<Feeds.Item> parseFeed(byte[] data) {
-        if (data == null) return List.of();
-        try { return Feeds.parse(new ByteArrayInputStream(data)); }
-        catch (Exception ignored) { return List.of(); }
     }
 
     private byte[] fetchCached(String cacheKey, String url, Map<String, String> headers) {

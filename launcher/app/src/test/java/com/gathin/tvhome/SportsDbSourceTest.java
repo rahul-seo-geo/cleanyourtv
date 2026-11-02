@@ -137,6 +137,56 @@ public class SportsDbSourceTest {
         assertEquals("sdb-16", selected.get(15).id);
     }
 
+    private static List<MediaCard> parseLeague(String eventsBody) {
+        return SportsDbSource.parseLeague(json("{\"events\":" + eventsBody + "}"), NOW);
+    }
+
+    private static String leagueEvent(String id, String title, String thumb) {
+        return "{\"idEvent\":\"" + id + "\",\"strEvent\":\"" + title + "\",\"strThumb\":\"" + thumb + "\","
+                + "\"strStatus\":\"NS\",\"strLeague\":\"Test League\","
+                + "\"strHomeTeam\":\"Home FC\",\"strAwayTeam\":\"Away FC\","
+                + "\"dateEvent\":\"2030-01-01\",\"strTime\":\"15:00:00\"}";
+    }
+
+    @Test public void buildsLeagueUrlPerLeague() {
+        assertEquals("https://www.thesportsdb.com/api/v1/json/k/eventsnextleague.php?id=4328",
+                SportsDbSource.eventsLeagueUrl("k", "4328"));
+    }
+
+    @Test public void leagueCardUsesFixtureTitleAndAbsoluteThumb() {
+        List<MediaCard> cards = parseLeague("[" + leagueEvent("1", "Home FC vs Away FC",
+                "https://cdn.example/thumb.jpg") + "]");
+        assertEquals(1, cards.size());
+        MediaCard card = cards.get(0);
+        assertEquals("sdb-1", card.id);
+        assertEquals(MediaCard.Kind.SPORTS, card.kind);
+        assertEquals("Home FC vs Away FC", card.title);
+        assertEquals("https://cdn.example/thumb.jpg", card.artUrl);
+        assertEquals(MediaCard.State.UPCOMING, card.state);
+        assertTrue(card.line, card.line.startsWith("Test League · "));
+    }
+
+    @Test public void leagueCardDropsMissingAndNonAbsoluteThumb() {
+        assertEquals("", parseLeague("[" + leagueEvent("1", "Home FC vs Away FC", "") + "]")
+                .get(0).artUrl);
+        assertEquals("", parseLeague("[" + leagueEvent("1", "Home FC vs Away FC", "/pic/x.png") + "]")
+                .get(0).artUrl);
+        assertEquals("", parseLeague("[" + leagueEvent("1", "Home FC vs Away FC",
+                "//cdn.example/x.png") + "]").get(0).artUrl);
+    }
+
+    @Test public void leagueCardFallsBackToTeamsTitleWhenStrEventBlank() {
+        List<MediaCard> cards = parseLeague("[" + leagueEvent("1", "", "https://cdn.example/t.jpg") + "]");
+        assertEquals("Home FC vs Away FC", cards.get(0).title);
+        assertEquals("https://cdn.example/t.jpg", cards.get(0).artUrl);
+    }
+
+    @Test public void defensiveAgainstGarbageLeagueEntries() {
+        assertTrue(SportsDbSource.parseLeague(null, NOW).isEmpty());
+        assertTrue(SportsDbSource.parseLeague(json("]]garbage"), NOW).isEmpty());
+        assertTrue(parseLeague("[null,{\"strThumb\":\"x\"},42]").isEmpty());
+    }
+
     @Test public void defensiveAgainstGarbageEntries() {
         assertTrue(SportsDbSource.parseTeam(null, "100", NOW).isEmpty());
         assertTrue(SportsDbSource.parseTeam(json("]]garbage"), "100", NOW).isEmpty());

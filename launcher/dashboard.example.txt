@@ -9,6 +9,8 @@ jellyfin_user=
 # sportsdb_key / sportsdb_teams: TheSportsDB fixtures for the hero (comma-separated team IDs)
 sportsdb_key=
 sportsdb_teams=
+# sportsdb_leagues: comma-separated league IDs added to the hero alongside the team fixtures
+sportsdb_leagues=
 jellyfin_package=
 player_package=
 m3u_url=

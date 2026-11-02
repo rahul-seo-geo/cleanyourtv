@@ -317,4 +317,96 @@ public class MediaLoaderTest {
         assertFalse(noKey.sources.containsKey("sportsdb"));
         assertFalse(noTeams.sources.containsKey("sportsdb"));
     }
+
+    @Test public void sportsdbRunsWithLeaguesOnlyWhenTeamsBlank() {
+        responses.put("https://www.thesportsdb.com/api/v1/json/k/eventsnextleague.php?id=4328",
+                json("{\"events\":[{\"idEvent\":\"7\",\"strEvent\":\"Home FC vs Away FC\","
+                        + "\"strStatus\":\"NS\",\"strLeague\":\"L\",\"strHomeTeam\":\"Home FC\","
+                        + "\"strAwayTeam\":\"Away FC\",\"dateEvent\":\"2027-01-16\",\"strTime\":\"15:00:00\"}]}"));
+        MediaSnapshot snapshot = loader().load(MediaSettings.parse("sportsdb_key=k\nsportsdb_leagues=4328"),
+                MediaSnapshot.empty());
+        assertEquals(1, snapshot.sportsHero.size());
+        assertEquals("sdb-7", snapshot.sportsHero.get(0).id);
+        assertEquals("Home FC vs Away FC", snapshot.sportsHero.get(0).title);
+        assertEquals(MediaSnapshot.Freshness.FRESH, snapshot.sources.get("sportsdb").freshness);
+    }
+
+    @Test public void sportsdbLeagueCardYieldedToTeamCardForTheSameFixture() {
+        String teamEvent = "{\"idEvent\":\"9\",\"strStatus\":\"\",\"dateEvent\":\"2027-01-16\","
+                + "\"strTime\":\"15:00:00\",\"strLeague\":\"L\",\"strHomeTeam\":\"Home FC\","
+                + "\"idHomeTeam\":\"100\",\"strAwayTeam\":\"Away FC\",\"idAwayTeam\":\"200\","
+                + "\"strAwayTeamBadge\":\"/pic/away.png\"}";
+        String leagueEvent = "{\"idEvent\":\"9\",\"strEvent\":\"Home FC vs Away FC\","
+                + "\"strThumb\":\"https://cdn.example/thumb.jpg\",\"strStatus\":\"NS\","
+                + "\"strLeague\":\"L\",\"strHomeTeam\":\"Home FC\",\"strAwayTeam\":\"Away FC\","
+                + "\"dateEvent\":\"2027-01-16\",\"strTime\":\"15:00:00\"}";
+        responses.put("https://www.thesportsdb.com/api/v1/json/k/eventsnextteam.php?id=100",
+                json("{\"events\":[" + teamEvent + "]}"));
+        responses.put("https://www.thesportsdb.com/api/v1/json/k/eventsnextleague.php?id=4328",
+                json("{\"events\":[" + leagueEvent + ","
+                        + leagueEvent.replace("\"9\"", "\"10\"") + "]}"));
+        MediaSettings settings = MediaSettings.parse("sportsdb_key=k\nsportsdb_teams=100\nsportsdb_leagues=4328");
+        MediaSnapshot snapshot = loader().load(settings, MediaSnapshot.empty());
+        assertEquals(2, snapshot.sportsHero.size());
+        MediaCard teamCard = snapshot.sportsHero.get(0);
+        assertEquals("sdb-9", teamCard.id);
+        assertEquals("Away FC", teamCard.title); // the team card's opponent title, not the fixture title
+        assertEquals("https://www.thesportsdb.com/pic/away.png", teamCard.artUrl);
+        assertEquals("sdb-10", snapshot.sportsHero.get(1).id); // the league-only fixture still joins
+        assertEquals("Home FC vs Away FC", snapshot.sportsHero.get(1).title);
+    }
+
+    @Test public void sportsdbLeagueListsMergeAndCapAtSixteen() {
+        for (int league : new int[] {4328, 4480}) {
+            StringBuilder events = new StringBuilder("{\"events\":[");
+            for (int i = 1; i <= 10; i++) {
+                if (i > 1) events.append(',');
+                int id = league + i;
+                events.append("{\"idEvent\":\"").append(id)
+                        .append("\",\"strEvent\":\"Home vs Away\",\"strStatus\":\"NS\","
+                                + "\"strLeague\":\"L\",\"strHomeTeam\":\"Home\",\"strAwayTeam\":\"Away\","
+                                + "\"dateEvent\":\"2027-01-16\",\"strTime\":\"")
+                        .append(String.format(java.util.Locale.ROOT, "%02d:00:00", i)).append("\"}");
+            }
+            events.append("]}");
+            responses.put("https://www.thesportsdb.com/api/v1/json/k/eventsnextleague.php?id=" + league,
+                    json(events.toString()));
+        }
+        MediaSnapshot snapshot = loader().load(MediaSettings.parse("sportsdb_key=k\nsportsdb_leagues=4328,4480"),
+                MediaSnapshot.empty());
+        assertEquals(16, snapshot.sportsHero.size());
+        assertEquals("sdb-4329", snapshot.sportsHero.get(0).id); // earliest kickoff first
+        assertEquals("sdb-4488", snapshot.sportsHero.get(15).id);
+    }
+
+    @Test public void sportsdbFailedLeagueDoesNotFailSourceWhenOthersSucceed() {
+        responses.put("https://www.thesportsdb.com/api/v1/json/k/eventsnextleague.php?id=4480",
+                json("{\"events\":[{\"idEvent\":\"7\",\"strEvent\":\"Home FC vs Away FC\","
+                        + "\"strStatus\":\"NS\",\"strLeague\":\"L\",\"strHomeTeam\":\"Home FC\","
+                        + "\"strAwayTeam\":\"Away FC\",\"dateEvent\":\"2027-01-16\",\"strTime\":\"15:00:00\"}]}"));
+        MediaSettings settings = MediaSettings.parse("sportsdb_key=k\nsportsdb_teams=100\nsportsdb_leagues=4328,4480");
+        MediaSnapshot snapshot = loader().load(settings, MediaSnapshot.empty());
+        assertEquals(1, snapshot.sportsHero.size());
+        assertEquals("sdb-7", snapshot.sportsHero.get(0).id);
+        assertEquals(MediaSnapshot.Freshness.FRESH, snapshot.sources.get("sportsdb").freshness);
+    }
+
+    @Test public void sportsdbTotalFailureAcrossTeamsAndLeaguesReusesStale() {
+        responses.put("https://www.thesportsdb.com/api/v1/json/k/eventsnextteam.php?id=100",
+                json("{\"events\":[{\"idEvent\":\"9\",\"strStatus\":\"\",\"dateEvent\":\"2027-01-16\","
+                        + "\"strTime\":\"15:00:00\",\"strLeague\":\"L\",\"strHomeTeam\":\"Home\","
+                        + "\"idHomeTeam\":\"100\",\"strAwayTeam\":\"Away\",\"idAwayTeam\":\"200\"}]}"));
+        responses.put("https://www.thesportsdb.com/api/v1/json/k/eventsnextleague.php?id=4328",
+                json("{\"events\":[{\"idEvent\":\"10\",\"strEvent\":\"Home vs Away\",\"strStatus\":\"NS\","
+                        + "\"strLeague\":\"L\",\"strHomeTeam\":\"Home\",\"strAwayTeam\":\"Away\","
+                        + "\"dateEvent\":\"2027-01-16\",\"strTime\":\"16:00:00\"}]}"));
+        MediaSettings settings = MediaSettings.parse("sportsdb_key=k\nsportsdb_teams=100\nsportsdb_leagues=4328");
+        MediaLoader unit = loader();
+        MediaSnapshot first = unit.load(settings, MediaSnapshot.empty());
+        assertEquals(2, first.sportsHero.size());
+        responses.clear();
+        MediaSnapshot stale = unit.load(settings, first);
+        assertEquals(2, stale.sportsHero.size());
+        assertEquals(MediaSnapshot.Freshness.STALE, stale.sources.get("sportsdb").freshness);
+    }
 }

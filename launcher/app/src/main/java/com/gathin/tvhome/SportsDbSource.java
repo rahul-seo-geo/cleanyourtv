@@ -28,6 +28,10 @@ final class SportsDbSource {
         return HOST + "/api/v1/json/" + apiKey + "/eventsnextteam.php?id=" + teamId;
     }
 
+    static String eventsLeagueUrl(String apiKey, String leagueId) {
+        return HOST + "/api/v1/json/" + apiKey + "/eventsnextleague.php?id=" + leagueId;
+    }
+
     /** "/pic/x.png" to an absolute URL; "" when missing. */
     static String absoluteBadge(String badge) {
         if (badge == null || badge.isEmpty() || badge.startsWith("//")) return "";
@@ -101,6 +105,34 @@ final class SportsDbSource {
                     line(event.optString("strLeague", ""), kickoff),
                     state(event.optString("strStatus", ""), kickoff, nowMs),
                     kickoff, 0, "", "", badge));
+        }
+        return cards;
+    }
+
+    /** The league's next event; the fixture itself is the card, with no badge art. */
+    static List<MediaCard> parseLeague(byte[] body, long nowMs) {
+        List<MediaCard> cards = new ArrayList<>();
+        JSONObject page = object(body);
+        JSONArray events = page == null ? null : page.optJSONArray("events");
+        if (events == null && page != null && page.has("idEvent")) events = new JSONArray().put(page);
+        if (events == null) return cards;
+        for (int i = 0; i < events.length(); i++) {
+            JSONObject event = events.optJSONObject(i);
+            if (event == null) continue;
+            String idEvent = event.optString("idEvent", "");
+            if (idEvent.isEmpty()) continue;
+            String title = event.optString("strEvent", "");
+            if (title.isEmpty()) {
+                title = event.optString("strHomeTeam", "") + " vs "
+                        + event.optString("strAwayTeam", "");
+            }
+            String art = event.optString("strThumb", "");
+            if (!art.startsWith("http://") && !art.startsWith("https://")) art = "";
+            long kickoff = kickoffMs(event.optString("dateEvent", ""), event.optString("strTime", ""));
+            cards.add(new MediaCard("sdb-" + idEvent, MediaCard.Kind.SPORTS, title,
+                    line(event.optString("strLeague", ""), kickoff),
+                    state(event.optString("strStatus", ""), kickoff, nowMs),
+                    kickoff, 0, "", "", art));
         }
         return cards;
     }

@@ -161,8 +161,11 @@ final class MediaLoader {
                 statuses.put("jellyfin", new MediaSnapshot.SourceState(MediaSnapshot.Freshness.STALE, now));
             }
         }
-        if (!settings.get("sportsdb_key").isEmpty() && !settings.get("sportsdb_teams").isEmpty()) {
-            loadSportsDb(settings.get("sportsdb_key"), settings.get("sportsdb_teams"), now, statuses, heroSports);
+        String sportsdbTeams = settings.get("sportsdb_teams");
+        String sportsdbLeagues = settings.get("sportsdb_leagues");
+        if (!settings.get("sportsdb_key").isEmpty()
+                && (!sportsdbTeams.isEmpty() || !sportsdbLeagues.isEmpty())) {
+            loadSportsDb(settings.get("sportsdb_key"), sportsdbTeams, sportsdbLeagues, now, statuses, heroSports);
             if (statuses.get("sportsdb").freshness == MediaSnapshot.Freshness.UNAVAILABLE
                     && !previous.sportsHero.isEmpty()) {
                 heroSports.addAll(SportsDbSource.heroCards(previous.sportsHero, now, SPORTS_HERO_LIMIT));
@@ -283,8 +286,8 @@ final class MediaLoader {
                 : (cached ? MediaSnapshot.Freshness.STALE : MediaSnapshot.Freshness.UNAVAILABLE), now));
     }
 
-    /** One eventsnextteam call per team per refresh; the free tier's budget is a handful of teams. */
-    private void loadSportsDb(String apiKey, String teams, long now,
+    /** One eventsnextteam call per team and one eventsnextleague call per league per refresh. */
+    private void loadSportsDb(String apiKey, String teams, String leagues, long now,
                               Map<String, MediaSnapshot.SourceState> statuses,
                               List<MediaCard> heroSports) {
         Map<String, MediaCard> byEvent = new LinkedHashMap<>();
@@ -297,6 +300,17 @@ final class MediaLoader {
             fresh = true;
             for (MediaCard card : SportsDbSource.parseTeam(body, team, now)) {
                 byEvent.putIfAbsent(card.id, card); // the same fixture can appear for both clubs
+            }
+        }
+        for (String league : leagues.split(",")) {
+            league = league.trim();
+            if (league.isEmpty()) continue;
+            byte[] body = fetcher.get(SportsDbSource.eventsLeagueUrl(apiKey, league), Map.of());
+            if (body == null) continue;
+            fresh = true;
+            for (MediaCard card : SportsDbSource.parseLeague(body, now)) {
+                if (byEvent.containsKey(card.id)) continue; // team cards win: opponent title + badge art
+                byEvent.put(card.id, card);
             }
         }
         heroSports.addAll(SportsDbSource.heroCards(byEvent.values(), now, SPORTS_HERO_LIMIT));

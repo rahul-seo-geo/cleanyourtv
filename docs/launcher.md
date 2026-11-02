@@ -115,6 +115,7 @@ scripts address the installed package.
 | `jellyfin_url`, `jellyfin_key` | The hero's Continue watching and New downloads categories, and Jellyfin card launches | No Jellyfin hero items |
 | `jellyfin_user` | Jellyfin user name behind the hero items; the first user is used when blank or unmatched | First user |
 | `sportsdb_key`, `sportsdb_teams` | TheSportsDB key and comma-separated team IDs for the hero's Upcoming games category | Source skipped |
+| `sportsdb_leagues` | Comma-separated league IDs whose next fixtures join the hero's Upcoming games category | League fixtures skipped |
 | `jellyfin_package` | Reserved for a Jellyfin app target; not consumed yet | No effect |
 | `player_package` | Reserved for a preferred player target; not consumed yet | No effect |
 | `m3u_url` | M3U playlist channels | No playlist channels |

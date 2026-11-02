@@ -101,6 +101,8 @@ final class JellyfinSource {
         int season = item.optInt("ParentIndexNumber", 0);
         int episode = item.optInt("IndexNumber", 0);
         String epName = item.optString("Name", "");
+        if (epName.contains("[") || epName.endsWith(".mkv") || epName.endsWith(".mp4")
+                || epName.endsWith(".avi")) epName = ""; // raw release filenames carry no episode title
         StringBuilder sb = new StringBuilder();
         if (season > 0 && episode > 0) {
             sb.append("S").append(season).append(" E").append(episode);

@@ -114,6 +114,13 @@ public class JellyfinSourceTest {
         assertEquals("The Episode", JellyfinSource.parseNextUp(body, BASE, 5).get(0).line);
     }
 
+    @Test public void releaseFilenameEpisodeNamesAreDroppedFromTheLine() {
+        byte[] body = json("{\"Items\":[{\"Id\":\"e1\",\"SeriesId\":\"s1\",\"SeriesName\":\"A Show\","
+                + "\"ParentIndexNumber\":2026,\"IndexNumber\":3,"
+                + "\"Name\":\"A Show (1964) - 2026-10-17 - MOTD [HDTV-1080p][h264]-FTP\"}]}");
+        assertEquals("S2026 E3", JellyfinSource.parseNextUp(body, BASE, 5).get(0).line);
+    }
+
     @Test public void parsesNewEpisodesDeduplicatedBySeriesWithNewPrefix() {
         byte[] body = json("[{\"Id\":\"e1\",\"SeriesId\":\"s1\",\"SeriesName\":\"A Show\","
                 + "\"ParentIndexNumber\":1,\"IndexNumber\":9,\"Name\":\"Latest Ep\"},"

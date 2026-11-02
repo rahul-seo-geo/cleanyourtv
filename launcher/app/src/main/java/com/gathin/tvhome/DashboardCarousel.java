@@ -139,12 +139,13 @@ public final class DashboardCarousel extends LinearLayout {
         if (pool.isEmpty()) return;
         int size = pool.size();
         int center = Math.min(rotation.center(), size - 1);
-        boolean[] bound = new boolean[size]; // A pool smaller than the rail wraps: no card twice.
+        // Short pools fill the middle slots only, so the focused card keeps the center slot
+        // and no card repeats; offsets within |offset| < size wrap to distinct cards.
         for (int i = 0; i < SLOTS; i++) {
             View slot = slots.get(i);
-            int index = (center + i - SLOTS / 2 + size) % size;
-            if (size < SLOTS && bound[index]) { slot.setVisibility(GONE); continue; }
-            bound[index] = true;
+            int offset = i - SLOTS / 2;
+            if (size < SLOTS && Math.abs(offset) >= size) { slot.setVisibility(GONE); continue; }
+            int index = (center + offset + size) % size;
             slot.setVisibility(VISIBLE);
             slot.setScaleX(SLOT_SCALE[i]);
             slot.setScaleY(SLOT_SCALE[i]);

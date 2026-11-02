@@ -206,8 +206,8 @@ public final class DashboardCarousel extends LinearLayout {
 
     private void rotate() {
         if (!rotating) return;
-        // Paused while focused or within 30s of a key: the tick is skipped, never reset.
-        boolean paused = hasFocus() || SystemClock.uptimeMillis() - lastKeyMs < KEY_PAUSE_MS;
+        // Paused within 30s of a key: the tick is skipped, never reset.
+        boolean paused = SystemClock.uptimeMillis() - lastKeyMs < KEY_PAUSE_MS;
         if (!paused && !pool().isEmpty()) {
             rotation.advance();
             bindRail();

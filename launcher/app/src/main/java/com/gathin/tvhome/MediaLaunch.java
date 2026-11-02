@@ -1,5 +1,6 @@
 package com.gathin.tvhome;
 
+import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.net.Uri;
@@ -26,6 +27,22 @@ final class MediaLaunch {
         Intent home = jellyfinPackage.isEmpty()
                 ? null : ctx.getPackageManager().getLaunchIntentForPackage(jellyfinPackage);
         if (home != null) ctx.startActivity(home);
+    }
+
+    /** The Jellyfin Android TV app's own item screen; false when that app is not installed. */
+    static boolean openNativeItem(Context ctx, String itemId) {
+        Intent item = new Intent();
+        item.setComponent(new ComponentName("org.jellyfin.androidtv",
+                "org.jellyfin.androidtv.ui.itemdetail.FullDetailsActivity"));
+        item.putExtra("ItemId", itemId);
+        item.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        if (ctx.getPackageManager().resolveActivity(item, 0) == null) return false;
+        try {
+            ctx.startActivity(item);
+            return true;
+        } catch (Exception e) {
+            return false;
+        }
     }
 
     static void playStream(Context ctx, String playerPackage, String url) {

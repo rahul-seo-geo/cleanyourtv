@@ -5,6 +5,7 @@ import android.os.Handler;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
@@ -14,6 +15,10 @@ import java.util.function.LongSupplier;
 
 final class MediaLoader {
     private static final int MAX_POSTER_DETAILS = 8;
+    private static final int CONTINUE_LIMIT = 6;
+    private static final int DOWNLOADS_LIMIT = 5;
+    private static final int UPCOMING_LIMIT = 5;
+    private static final int SPORTS_HERO_LIMIT = 16;
 
     interface Fetcher { byte[] get(String url, Map<String, String> headers); }
     interface Store { byte[] read(String key); void put(String key, byte[] value); long ageSeconds(String key); }
@@ -128,16 +133,41 @@ final class MediaLoader {
         List<MediaCard> series = new ArrayList<>();
         List<MediaCard> live = new ArrayList<>();
         List<MediaCard> sportsCards = new ArrayList<>();
+        List<MediaCard> continueCards = new ArrayList<>();
+        List<MediaCard> downloadCards = new ArrayList<>();
+        List<MediaCard> upcomingCards = new ArrayList<>();
+        List<MediaCard> heroSports = new ArrayList<>();
 
         String seerrUrl = settings.get("seerr_url");
         String playlistUrl = settings.get("m3u_url");
         if (!seerrUrl.isEmpty()) {
-            loadSeerr(seerrUrl, settings.get("seerr_key"), now, statuses, movies, series);
+            loadSeerr(seerrUrl, settings.get("seerr_key"), now, statuses, movies, series, upcomingCards);
             if (statuses.get("seerr").freshness == MediaSnapshot.Freshness.UNAVAILABLE
                     && (!previous.movies.isEmpty() || !previous.series.isEmpty())) {
                 movies.addAll(previous.movies);
                 series.addAll(previous.series);
                 statuses.put("seerr", new MediaSnapshot.SourceState(MediaSnapshot.Freshness.STALE, now));
+            }
+        }
+        String jellyBase = settings.get("jellyfin_url");
+        String jellyApiKey = settings.get("jellyfin_key");
+        if (!jellyBase.isEmpty() && !jellyApiKey.isEmpty()) {
+            loadJellyfin(jellyBase, jellyApiKey, settings.get("jellyfin_user"), now,
+                    statuses, continueCards, downloadCards);
+            if (statuses.get("jellyfin").freshness == MediaSnapshot.Freshness.UNAVAILABLE
+                    && (!previous.continueCards.isEmpty() || !previous.downloadCards.isEmpty())) {
+                continueCards.addAll(previous.continueCards);
+                downloadCards.addAll(previous.downloadCards);
+                statuses.put("jellyfin", new MediaSnapshot.SourceState(MediaSnapshot.Freshness.STALE, now));
+            }
+        }
+        if (!settings.get("sportsdb_key").isEmpty() && !settings.get("sportsdb_teams").isEmpty()) {
+            loadSportsDb(settings.get("sportsdb_key"), settings.get("sportsdb_teams"), now, statuses, heroSports);
+            if (statuses.get("sportsdb").freshness == MediaSnapshot.Freshness.UNAVAILABLE
+                    && !previous.sportsHero.isEmpty()) {
+                heroSports.addAll(SportsDbSource.heroCards(previous.sportsHero, now, SPORTS_HERO_LIMIT));
+                if (!heroSports.isEmpty())
+                    statuses.put("sportsdb", new MediaSnapshot.SourceState(MediaSnapshot.Freshness.STALE, now));
             }
         }
         if (!playlistUrl.isEmpty()) {
@@ -159,19 +189,23 @@ final class MediaLoader {
                     : MediaSnapshot.Freshness.STALE), now));
         }
         return new MediaSnapshot(MediaSnapshot.dropExpired(movies, now),
-                MediaSnapshot.dropExpired(series, now), sportsCards, live, statuses);
+                MediaSnapshot.dropExpired(series, now), sportsCards, live,
+                MediaSnapshot.dropExpired(continueCards, now),
+                MediaSnapshot.dropExpired(downloadCards, now),
+                MediaSnapshot.dropExpired(upcomingCards, now), heroSports, statuses);
     }
 
     private void loadSeerr(String base, String key, long now,
                            Map<String, MediaSnapshot.SourceState> statuses,
-                           List<MediaCard> movies, List<MediaCard> series) {
+                           List<MediaCard> movies, List<MediaCard> series,
+                           List<MediaCard> upcomingCards) {
         Map<String, String> headers = SeerrSource.headers(key);
         boolean fresh = false;
         boolean cached = false;
         String[] keys = {"seerr-request", "seerr-upcoming-movie", "seerr-upcoming-series"};
         String[] urls = {SeerrSource.requestsUrl(base),
-                SeerrSource.upcomingUrl(base, MediaCard.Kind.MOVIE),
-                SeerrSource.upcomingUrl(base, MediaCard.Kind.SERIES)};
+                SeerrSource.upcomingUrl(base, MediaCard.Kind.MOVIE, UPCOMING_LIMIT),
+                SeerrSource.upcomingUrl(base, MediaCard.Kind.SERIES, UPCOMING_LIMIT)};
         for (int i = 0; i < keys.length; i++) {
             byte[] body = fetcher.get(urls[i], headers);
             if (body == null) {
@@ -187,6 +221,11 @@ final class MediaLoader {
             if (!fresh && !cards.isEmpty()) cached = true;
             for (MediaCard card : cards) {
                 (card.kind == MediaCard.Kind.SERIES ? series : movies).add(card);
+            }
+            // The same upcoming responses also feed the hero's five-card UPCOMING category.
+            if (i > 0) {
+                for (int j = 0; j < cards.size() && upcomingCards.size() < UPCOMING_LIMIT; j++)
+                    upcomingCards.add(cards.get(j));
             }
         }
         // Request-card detail art is a best-effort decoration, never a source of freshness or stored payloads.
@@ -212,6 +251,57 @@ final class MediaLoader {
         statuses.put("seerr", new MediaSnapshot.SourceState(fresh
                 ? MediaSnapshot.Freshness.FRESH
                 : (cached ? MediaSnapshot.Freshness.STALE : MediaSnapshot.Freshness.UNAVAILABLE), now));
+    }
+
+    private void loadJellyfin(String base, String apiKey, String userName, long now,
+                              Map<String, MediaSnapshot.SourceState> statuses,
+                              List<MediaCard> continueCards, List<MediaCard> downloadCards) {
+        Map<String, String> headers = JellyfinSource.headers(apiKey);
+        String userId = JellyfinSource.resolveUser(fetcher, base, apiKey, userName);
+        boolean fresh = false;
+        boolean cached = false;
+        String[] keys = {"jellyfin-continue", "jellyfin-latest"};
+        String[] urls = userId == null ? new String[0] : new String[] {
+                JellyfinSource.continueUrl(base, userId, CONTINUE_LIMIT),
+                JellyfinSource.latestUrl(base, userId, DOWNLOADS_LIMIT)};
+        for (int i = 0; i < urls.length; i++) {
+            byte[] body = fetcher.get(urls[i], headers);
+            if (body == null) {
+                body = store.read(keys[i]);
+            } else {
+                store.put(keys[i], body);
+                fresh = true;
+            }
+            if (body == null) continue;
+            List<MediaCard> cards = i == 0 ? JellyfinSource.parseItems(body, base, CONTINUE_LIMIT)
+                    : JellyfinSource.parseLatest(body, base, DOWNLOADS_LIMIT);
+            if (!fresh && !cards.isEmpty()) cached = true;
+            (i == 0 ? continueCards : downloadCards).addAll(cards);
+        }
+        statuses.put("jellyfin", new MediaSnapshot.SourceState(fresh
+                ? MediaSnapshot.Freshness.FRESH
+                : (cached ? MediaSnapshot.Freshness.STALE : MediaSnapshot.Freshness.UNAVAILABLE), now));
+    }
+
+    /** One eventsnextteam call per team per refresh; the free tier's budget is a handful of teams. */
+    private void loadSportsDb(String apiKey, String teams, long now,
+                              Map<String, MediaSnapshot.SourceState> statuses,
+                              List<MediaCard> heroSports) {
+        Map<String, MediaCard> byEvent = new LinkedHashMap<>();
+        boolean fresh = false;
+        for (String team : teams.split(",")) {
+            team = team.trim();
+            if (team.isEmpty()) continue;
+            byte[] body = fetcher.get(SportsDbSource.eventsUrl(apiKey, team), Map.of());
+            if (body == null) continue;
+            fresh = true;
+            for (MediaCard card : SportsDbSource.parseTeam(body, team, now)) {
+                byEvent.putIfAbsent(card.id, card); // the same fixture can appear for both clubs
+            }
+        }
+        heroSports.addAll(SportsDbSource.heroCards(byEvent.values(), now, SPORTS_HERO_LIMIT));
+        statuses.put("sportsdb", new MediaSnapshot.SourceState(fresh
+                ? MediaSnapshot.Freshness.FRESH : MediaSnapshot.Freshness.UNAVAILABLE, now));
     }
 
     private void loadPlaylist(String url, long now,

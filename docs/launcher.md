@@ -111,8 +111,10 @@ scripts address the installed package.
 
 | Setting | What it feeds | When blank |
 |---|---|---|
-| `seerr_url`, `seerr_key` | Seerr movies and series | No Seerr items |
-| `jellyfin_url`, `jellyfin_key` | Reserved for a Jellyfin connection; not consumed by the current dashboard | No effect |
+| `seerr_url`, `seerr_key` | Seerr movies and series, plus the hero's Coming soon category | No Seerr items |
+| `jellyfin_url`, `jellyfin_key` | The hero's Continue watching and New downloads categories, and Jellyfin card launches | No Jellyfin hero items |
+| `jellyfin_user` | Jellyfin user name behind the hero items; the first user is used when blank or unmatched | First user |
+| `sportsdb_key`, `sportsdb_teams` | TheSportsDB key and comma-separated team IDs for the hero's Upcoming games category | Source skipped |
 | `jellyfin_package` | Reserved for a Jellyfin app target; not consumed yet | No effect |
 | `player_package` | Reserved for a preferred player target; not consumed yet | No effect |
 | `m3u_url` | M3U playlist channels | No playlist channels |

@@ -198,6 +198,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
     private MediaSettings mediaSettings;
     private MediaLoader mediaLoader;
     private PosterLoader posterLoader;
+    private HeroStrip heroStrip;
     private View raceBar;
     private LinearLayout racePager;
     private long rotationStart;
@@ -543,11 +544,21 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         gameDay = GameDay.create(this, cfg.gameDay, handler, this::updatePanel);
         mediaSettings = MediaSettings.read(this);
         if (mediaSettings.anySource()) {
-            posterLoader = new PosterLoader();
+            posterLoader = new PosterLoader(new PosterStore(new File(getFilesDir(), "poster-cache")),
+                    url -> {
+                        String base = mediaSettings.get("jellyfin_url");
+                        String key = mediaSettings.get("jellyfin_key");
+                        return !base.isEmpty() && !key.isEmpty() && url.startsWith(base + "/Items/")
+                                ? JellyfinSource.headers(key) : java.util.Map.of();
+                    });
+            heroStrip = findViewById(R.id.heroStrip);
+            heroStrip.setHost(this::openMediaCard);
+            heroStrip.setPosterLoader(posterLoader);
             mediaLoader = MediaLoader.create(this, mediaSettings, handler, snapshot -> {
                 MediaBand band = (MediaBand) findViewById(R.id.mediaBand);
                 boolean was = band.getVisibility() == View.VISIBLE;
                 band.apply(snapshot);
+                heroStrip.apply(snapshot);
                 // The band and the race panel trade that space: re-decide the panel the moment the band flips.
                 if (was != (band.getVisibility() == View.VISIBLE)) updatePanel();
                 aimTopButtons(band.getVisibility() == View.VISIBLE);
@@ -1373,6 +1384,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
      */
     @Override
     public boolean dispatchKeyEvent(KeyEvent event) {
+        if (heroStrip != null) heroStrip.notifyUserInteraction();
         // Vendor keys (TCL Netflix button, 4062) never reach the key services, only the focused window.
         if (event.getKeyCode() >= 1000 && RemoteKeys.handle(this, event, homeAppKeys.get(event.getKeyCode()), null)) return true;
         if (handleSettingsKey(event)) return true;
@@ -3188,13 +3200,15 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         }
     }
 
-    /** A band card: a live stream goes to the player, anything with a tmdbId resolves to a Jellyfin item,
-     *  and the rest just opens the Jellyfin app. */
+    /** A band card: a live stream goes to the player, a Jellyfin item card opens the app's own item
+     *  screen when installed, anything with a tmdbId resolves to a Jellyfin item, and the rest just
+     *  opens the Jellyfin app. */
     private void openMediaCard(MediaCard card) {
         if (card.kind == MediaCard.Kind.LIVE && !card.streamUrl.isEmpty()) {
             MediaLaunch.playStream(this, mediaSettings.get("player_package"), card.streamUrl);
             return;
         }
+        if (card.id.startsWith("jf-") && MediaLaunch.openNativeItem(this, card.id.substring(3))) return;
         if (!card.tmdbId.isEmpty() && mediaLoader != null) {
             mediaLoader.resolve(card.tmdbId, itemId ->
                     MediaLaunch.openItem(this, mediaSettings.get("jellyfin_package"), itemId));

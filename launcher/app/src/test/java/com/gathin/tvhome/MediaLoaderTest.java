@@ -42,9 +42,9 @@ public class MediaLoaderTest {
     @Test public void healthySourcesProduceFreshSnapshotPerCategory() {
         responses.put("https://seerr.example/api/v1/request",
                 json("[{\"id\":1,\"status\":3,\"media\":{\"mediaType\":\"movie\",\"tmdbId\":550,\"title\":\"Fight Club\"}}]"));
-        responses.put("https://seerr.example/api/v1/discover/movies/upcoming",
+        responses.put("https://seerr.example/api/v1/discover/movies/upcoming?limit=5",
                 json("{\"results\":[{\"title\":\"Next Film\",\"release_date\":\"2030-01-01\"}]}"));
-        responses.put("https://seerr.example/api/v1/discover/tv/upcoming", json("{\"results\":[]}"));
+        responses.put("https://seerr.example/api/v1/discover/tv/upcoming?limit=5", json("{\"results\":[]}"));
         responses.put("http://nas/p.m3u", json("#EXTM3U\n#EXTINF:-1 group-title=\"News\",ABC\nhttp://nas/abc.ts\n"));
         turns = List.of(new GameDay.Turn("AFL", "Puck drop", NOW - 1000, NOW + 1000, 0xFF112233));
 
@@ -154,9 +154,9 @@ public class MediaLoaderTest {
             upcomingMovies.append("{\"id\":").append(i).append(",\"title\":\"Film\"}");
             upcomingSeries.append("{\"id\":").append(i).append(",\"name\":\"Show\"}");
         }
-        responses.put("https://seerr.example/api/v1/discover/movies/upcoming",
+        responses.put("https://seerr.example/api/v1/discover/movies/upcoming?limit=5",
                 json(upcomingMovies.append("]}").toString()));
-        responses.put("https://seerr.example/api/v1/discover/tv/upcoming",
+        responses.put("https://seerr.example/api/v1/discover/tv/upcoming?limit=5",
                 json(upcomingSeries.append("]}").toString()));
 
         loader().load(settings(), MediaSnapshot.empty());
@@ -186,5 +186,135 @@ public class MediaLoaderTest {
         MediaSnapshot degraded = unit.load(settings(), first);
         assertEquals(1, degraded.live.size()); // last-known retained from previous snapshot
         assertEquals(MediaSnapshot.Freshness.STALE, degraded.sources.get("playlist").freshness);
+    }
+
+    private static MediaSettings jellySettings() {
+        return MediaSettings.parse("jellyfin_url=https://jf.example\njellyfin_key=k\njellyfin_user=alice");
+    }
+
+    @Test public void jellyfinFillsContinueAndDownloadsFromTheNamedUser() {
+        responses.put("https://jf.example/Users", json("[{\"Id\":\"u1\",\"Name\":\"Alice\"}]"));
+        responses.put("https://jf.example/Users/u1/Items?Recursive=true&Filters=IsResumable"
+                        + "&SortBy=LastPlayedDate&SortOrder=Descending&Limit=6",
+                json("{\"Items\":[{\"Id\":\"a1\",\"Name\":\"Resume Me\",\"Type\":\"Movie\",\"ProductionYear\":2021}]}"));
+        responses.put("https://jf.example/Users/u1/Items/Latest?Limit=5",
+                json("[{\"Id\":\"b2\",\"Name\":\"Just Added\",\"Type\":\"Series\",\"ProductionYear\":2024}]"));
+        MediaSnapshot snapshot = loader().load(jellySettings(), MediaSnapshot.empty());
+        assertEquals(1, snapshot.continueCards.size());
+        assertEquals("jf-a1", snapshot.continueCards.get(0).id);
+        assertEquals(1, snapshot.downloadCards.size());
+        assertEquals("jf-b2", snapshot.downloadCards.get(0).id);
+        assertEquals(MediaSnapshot.Freshness.FRESH, snapshot.sources.get("jellyfin").freshness);
+    }
+
+    @Test public void jellyfinUnavailableReusesPreviousListsMarkedStale() {
+        responses.put("https://jf.example/Users", json("[{\"Id\":\"u1\",\"Name\":\"Alice\"}]"));
+        responses.put("https://jf.example/Users/u1/Items?Recursive=true&Filters=IsResumable"
+                        + "&SortBy=LastPlayedDate&SortOrder=Descending&Limit=6",
+                json("{\"Items\":[{\"Id\":\"a1\",\"Name\":\"Resume Me\",\"Type\":\"Movie\"}]}"));
+        responses.put("https://jf.example/Users/u1/Items/Latest?Limit=5", json("[]"));
+        MediaLoader unit = loader();
+        MediaSnapshot first = unit.load(jellySettings(), MediaSnapshot.empty());
+        responses.clear();
+        MediaSnapshot degraded = unit.load(jellySettings(), first);
+        assertEquals(1, degraded.continueCards.size());
+        assertEquals(MediaSnapshot.Freshness.STALE, degraded.sources.get("jellyfin").freshness);
+    }
+
+    @Test public void sportsdbFillsHeroSportsAndDedupesSharedFixtures() {
+        String event = "{\"idEvent\":\"9\",\"strStatus\":\"\",\"dateEvent\":\"2027-01-16\",\"strTime\":\"15:00:00\","
+                + "\"strLeague\":\"L\",\"strHomeTeam\":\"Home FC\",\"idHomeTeam\":\"100\","
+                + "\"strAwayTeam\":\"Away FC\",\"idAwayTeam\":\"200\"}";
+        responses.put("https://www.thesportsdb.com/api/v1/json/k/eventsnextteam.php?id=100",
+                json("{\"events\":[" + event + "]}"));
+        responses.put("https://www.thesportsdb.com/api/v1/json/k/eventsnextteam.php?id=200",
+                json("{\"events\":[" + event + "]}"));
+        MediaSettings settings = MediaSettings.parse("sportsdb_key=k\nsportsdb_teams=100, 200");
+        MediaSnapshot snapshot = loader().load(settings, MediaSnapshot.empty());
+        assertEquals(1, snapshot.sportsHero.size()); // same fixture from both clubs' listings
+        assertEquals("sdb-9", snapshot.sportsHero.get(0).id);
+        assertEquals(MediaSnapshot.Freshness.FRESH, snapshot.sources.get("sportsdb").freshness);
+    }
+
+    @Test public void heroMediaCategoriesShareSixFiveFiveBudget() {
+        responses.put("https://jf.example/Users", json("[{\"Id\":\"u1\",\"Name\":\"Alice\"}]"));
+        StringBuilder continuing = new StringBuilder("{\"Items\":[");
+        StringBuilder downloads = new StringBuilder("[");
+        StringBuilder upcomingMovies = new StringBuilder("{\"results\":[");
+        StringBuilder upcomingSeries = new StringBuilder("{\"results\":[");
+        for (int i = 1; i <= 9; i++) {
+            if (i > 1) {
+                continuing.append(',');
+                downloads.append(',');
+                upcomingMovies.append(',');
+                upcomingSeries.append(',');
+            }
+            continuing.append("{\"Id\":\"c").append(i).append("\",\"Name\":\"Continue\",\"Type\":\"Movie\"}");
+            downloads.append("{\"Id\":\"d").append(i).append("\",\"Name\":\"Download\",\"Type\":\"Movie\"}");
+            upcomingMovies.append("{\"id\":").append(i).append(",\"title\":\"Film\"}");
+            upcomingSeries.append("{\"id\":").append(i).append(",\"name\":\"Show\"}");
+        }
+        responses.put("https://jf.example/Users/u1/Items?Recursive=true&Filters=IsResumable"
+                        + "&SortBy=LastPlayedDate&SortOrder=Descending&Limit=6",
+                json(continuing.append("]}").toString()));
+        responses.put("https://jf.example/Users/u1/Items/Latest?Limit=5",
+                json(downloads.append(']').toString()));
+        responses.put("https://seerr.example/api/v1/discover/movies/upcoming?limit=5",
+                json(upcomingMovies.append("]}").toString()));
+        responses.put("https://seerr.example/api/v1/discover/tv/upcoming?limit=5",
+                json(upcomingSeries.append("]}").toString()));
+        MediaSnapshot snapshot = loader().load(MediaSettings.parse(
+                "jellyfin_url=https://jf.example\njellyfin_key=k\nseerr_url=https://seerr.example\nseerr_key=k"),
+                MediaSnapshot.empty());
+        assertEquals(6, snapshot.continueCards.size());
+        assertEquals(5, snapshot.downloadCards.size());
+        assertEquals(5, snapshot.upcomingCards.size());
+        assertEquals(16, snapshot.continueCards.size() + snapshot.downloadCards.size()
+                + snapshot.upcomingCards.size());
+        assertEquals("tmdb:1", snapshot.upcomingCards.get(0).id);
+        assertEquals("tmdb:5", snapshot.upcomingCards.get(4).id);
+    }
+
+    @Test public void sportsdbHeroCapsAfterSortingAcrossTeams() {
+        StringBuilder events = new StringBuilder("{\"events\":[");
+        for (int i = 20; i >= 1; i--) {
+            if (i < 20) events.append(',');
+            events.append("{\"idEvent\":\"").append(i)
+                    .append("\",\"strHomeTeam\":\"Home\",\"strAwayTeam\":\"Away\","
+                            + "\"idHomeTeam\":\"100\",\"idAwayTeam\":\"200\","
+                            + "\"dateEvent\":\"2027-01-16\",\"strTime\":\"")
+                    .append(String.format(java.util.Locale.ROOT, "%02d:00:00", i)).append("\"}");
+        }
+        responses.put("https://www.thesportsdb.com/api/v1/json/k/eventsnextteam.php?id=100",
+                json(events.append("]}").toString()));
+        MediaSnapshot snapshot = loader().load(MediaSettings.parse("sportsdb_key=k\nsportsdb_teams=100"),
+                MediaSnapshot.empty());
+        assertEquals(16, snapshot.sportsHero.size());
+        assertEquals("sdb-1", snapshot.sportsHero.get(0).id);
+        assertEquals("sdb-16", snapshot.sportsHero.get(15).id);
+    }
+
+    @Test public void sportsdbStaleReuseKeepsOnlyFixturesStillInTheSevenDayWindow() {
+        String event = "{\"idEvent\":\"9\",\"dateEvent\":\"2027-01-16\",\"strTime\":\"15:00:00\","
+                + "\"strHomeTeam\":\"Home\",\"idHomeTeam\":\"100\","
+                + "\"strAwayTeam\":\"Away\",\"idAwayTeam\":\"200\"}";
+        responses.put("https://www.thesportsdb.com/api/v1/json/k/eventsnextteam.php?id=100",
+                json("{\"events\":[" + event + "]}"));
+        MediaSettings settings = MediaSettings.parse("sportsdb_key=k\nsportsdb_teams=100");
+        MediaLoader unit = loader();
+        MediaSnapshot first = unit.load(settings, MediaSnapshot.empty());
+        responses.clear();
+        MediaSnapshot stale = unit.load(settings, first);
+        assertEquals(1, stale.sportsHero.size());
+        assertEquals(MediaSnapshot.Freshness.STALE, stale.sources.get("sportsdb").freshness);
+    }
+
+    @Test public void sportsdbSkippedWhenKeyOrTeamsBlank() {
+        MediaSnapshot noKey = loader().load(MediaSettings.parse("sportsdb_teams=100"), MediaSnapshot.empty());
+        MediaSnapshot noTeams = loader().load(MediaSettings.parse("sportsdb_key=k"), MediaSnapshot.empty());
+        assertTrue(noKey.sportsHero.isEmpty());
+        assertTrue(noTeams.sportsHero.isEmpty());
+        assertFalse(noKey.sources.containsKey("sportsdb"));
+        assertFalse(noTeams.sources.containsKey("sportsdb"));
     }
 }

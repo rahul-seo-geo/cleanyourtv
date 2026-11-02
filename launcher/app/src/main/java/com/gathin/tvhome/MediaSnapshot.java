@@ -19,23 +19,40 @@ final class MediaSnapshot {
     final List<MediaCard> series;
     final List<MediaCard> sports;
     final List<MediaCard> live;
+    /** Hero strip categories, in rotation order: CONTINUE, DOWNLOADS, UPCOMING, SPORTS-HERO. */
+    final List<MediaCard> continueCards;
+    final List<MediaCard> downloadCards;
+    final List<MediaCard> upcomingCards;
+    final List<MediaCard> sportsHero;
     final Map<String, SourceState> sources;
 
     MediaSnapshot(List<MediaCard> movies, List<MediaCard> series, List<MediaCard> sports,
-                  List<MediaCard> live, Map<String, SourceState> sources) {
+                  List<MediaCard> live, List<MediaCard> continueCards, List<MediaCard> downloadCards,
+                  List<MediaCard> upcomingCards, List<MediaCard> sportsHero,
+                  Map<String, SourceState> sources) {
         this.movies = Collections.unmodifiableList(new ArrayList<>(movies));
         this.series = Collections.unmodifiableList(new ArrayList<>(series));
         this.sports = Collections.unmodifiableList(new ArrayList<>(sports));
         this.live = Collections.unmodifiableList(new ArrayList<>(live));
+        this.continueCards = Collections.unmodifiableList(new ArrayList<>(continueCards));
+        this.downloadCards = Collections.unmodifiableList(new ArrayList<>(downloadCards));
+        this.upcomingCards = Collections.unmodifiableList(new ArrayList<>(upcomingCards));
+        this.sportsHero = Collections.unmodifiableList(new ArrayList<>(sportsHero));
         this.sources = Collections.unmodifiableMap(new java.util.HashMap<>(sources));
     }
 
     static MediaSnapshot empty() {
-        return new MediaSnapshot(List.of(), List.of(), List.of(), List.of(), Map.of());
+        return new MediaSnapshot(List.of(), List.of(), List.of(), List.of(),
+                List.of(), List.of(), List.of(), List.of(), Map.of());
     }
 
     boolean anyContent() {
         return !movies.isEmpty() || !series.isEmpty() || !sports.isEmpty() || !live.isEmpty();
+    }
+
+    boolean anyHeroContent() {
+        return !continueCards.isEmpty() || !downloadCards.isEmpty()
+                || !upcomingCards.isEmpty() || !sportsHero.isEmpty();
     }
 
     /**

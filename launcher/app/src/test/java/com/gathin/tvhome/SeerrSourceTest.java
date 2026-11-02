@@ -110,10 +110,10 @@ public class SeerrSourceTest {
 
     @Test public void urlsAndHeadersMatchNewsAddonContract() {
         assertEquals("https://seerr.example/api/v1/request", SeerrSource.requestsUrl("https://seerr.example"));
-        assertEquals("https://seerr.example/api/v1/discover/movies/upcoming",
-                SeerrSource.upcomingUrl("https://seerr.example", MediaCard.Kind.MOVIE));
-        assertEquals("https://seerr.example/api/v1/discover/tv/upcoming",
-                SeerrSource.upcomingUrl("https://seerr.example", MediaCard.Kind.SERIES));
+        assertEquals("https://seerr.example/api/v1/discover/movies/upcoming?limit=5",
+                SeerrSource.upcomingUrl("https://seerr.example", MediaCard.Kind.MOVIE, 5));
+        assertEquals("https://seerr.example/api/v1/discover/tv/upcoming?limit=5",
+                SeerrSource.upcomingUrl("https://seerr.example", MediaCard.Kind.SERIES, 5));
         assertEquals("secret", SeerrSource.headers("secret").get("X-Api-Key"));
     }
 }

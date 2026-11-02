@@ -158,4 +158,8 @@
     <string name="media_tab_movies">Movies</string>
     <string name="media_tab_series">Series</string>
     <string name="media_tab_sports">Sports</string>
+    <string name="media_hero_continue">Continue watching</string>
+    <string name="media_hero_downloads">New downloads</string>
+    <string name="media_hero_upcoming">Coming soon</string>
+    <string name="media_hero_sports">Upcoming games</string>
 </resources>

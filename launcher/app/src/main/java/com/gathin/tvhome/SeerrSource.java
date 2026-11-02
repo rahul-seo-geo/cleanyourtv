@@ -30,9 +30,9 @@ final class SeerrSource {
         return detail == null ? "" : posterUrl(detail.optString("posterPath", ""));
     }
 
-    static String upcomingUrl(String base, MediaCard.Kind kind) {
+    static String upcomingUrl(String base, MediaCard.Kind kind, int limit) {
         return base + (kind == MediaCard.Kind.SERIES
-                ? "/api/v1/discover/tv/upcoming" : "/api/v1/discover/movies/upcoming");
+                ? "/api/v1/discover/tv/upcoming" : "/api/v1/discover/movies/upcoming") + "?limit=" + limit;
     }
 
     static List<MediaCard> parseRequests(byte[] body) {

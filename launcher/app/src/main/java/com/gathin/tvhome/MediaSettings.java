@@ -55,7 +55,9 @@ final class MediaSettings {
 
     /** Any configured source keeps the band on screen; a blank file keeps Home exactly as today. */
     boolean anySource() {
-        return !get("seerr_url").isEmpty() || !get("m3u_url").isEmpty() || !get("game_day_pkg").isEmpty();
+        return !get("seerr_url").isEmpty() || !get("m3u_url").isEmpty() || !get("game_day_pkg").isEmpty()
+                || !get("jellyfin_url").isEmpty() || !get("sportsdb_key").isEmpty()
+                || !get("sportsdb_teams").isEmpty();
     }
 
     int refreshMinutes() {

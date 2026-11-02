@@ -25,6 +25,10 @@ public class MediaSettingsTest {
         assertTrue(MediaSettings.parse("seerr_url=https://seerr.example").anySource());
         assertTrue(MediaSettings.parse("m3u_url=http://nas/playlist.m3u").anySource());
         assertTrue(MediaSettings.parse("game_day_pkg=com.gathin.game").anySource());
+        assertTrue(MediaSettings.parse("jellyfin_url=https://jf.example\njellyfin_key=k").anySource());
+        assertTrue(MediaSettings.parse("sportsdb_key=k\nsportsdb_teams=100").anySource());
+        assertTrue(MediaSettings.parse("sportsdb_key=k").anySource());
+        assertTrue(MediaSettings.parse("sportsdb_teams=100").anySource());
     }
 
     @Test public void refreshMinutesClampedToOneMinimum() {

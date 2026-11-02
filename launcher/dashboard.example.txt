@@ -4,6 +4,11 @@ seerr_url=
 seerr_key=
 jellyfin_url=
 jellyfin_key=
+# jellyfin_user: user name for the hero items; blank uses the first user
+jellyfin_user=
+# sportsdb_key / sportsdb_teams: TheSportsDB fixtures for the hero (comma-separated team IDs)
+sportsdb_key=
+sportsdb_teams=
 jellyfin_package=
 player_package=
 m3u_url=

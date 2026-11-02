@@ -41,6 +41,7 @@ public class MediaSnapshotTest {
         MediaSnapshot snapshot = new MediaSnapshot(List.of(), List.of(), List.of(),
                 List.of(new MediaCard("ch", MediaCard.Kind.LIVE, "Channel", "News",
                         MediaCard.State.AVAILABLE, 0, 0, "", "http://nas/ch.m3u8", "")),
+                List.of(), List.of(), List.of(), List.of(),
                 java.util.Map.of("playlist",
                         new MediaSnapshot.SourceState(MediaSnapshot.Freshness.FRESH, NOW)));
         assertTrue(snapshot.anyContent());

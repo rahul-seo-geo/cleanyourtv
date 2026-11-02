@@ -143,6 +143,38 @@ public class MediaLoaderTest {
                 snapshot.seriesPool.stream().map(c -> c.id).toList());
     }
 
+    @Test public void oneFailingJellyfinEndpointDoesNotStarveTheOtherSources() {
+        responses.put("https://jf.example/Users", json("[{\"Id\":\"u1\",\"Name\":\"Alice\"}]"));
+        responses.put("https://jf.example/Users/u1/Items?Recursive=true&Filters=IsResumable"
+                        + "&SortBy=LastPlayedDate&SortOrder=Descending&Limit=8",
+                json("{\"Items\":[{\"Id\":\"c2\",\"Name\":\"Resume Show\",\"Type\":\"Series\"}]}"));
+        responses.put("https://jf.example/Users/u1/Items/Latest?Limit=8",
+                json("[{\"Id\":\"d1\",\"Name\":\"Added Show\",\"Type\":\"Series\"}]"));
+        responses.put("https://seerr.example/api/v1/discover/tv/upcoming?limit=8",
+                json("{\"results\":[{\"id\":2,\"name\":\"Upcoming Show\",\"first_air_date\":\"2030-01-01\"}]}"));
+        List<Throwable> failures = new ArrayList<>();
+        MediaLoader.reporter = failures::add;
+        try {
+            MediaLoader throwing = loader((url, headers) -> {
+                if (url.equals("https://jf.example/Shows/NextUp?userId=u1&Limit=8"))
+                    throw new IllegalStateException("nextup 500");
+                return responses.get(url);
+            });
+            MediaSettings mixed = MediaSettings.parse(
+                    "jellyfin_url=https://jf.example\njellyfin_key=k\njellyfin_user=alice"
+                            + "\nseerr_url=https://seerr.example\nseerr_key=k");
+
+            MediaSnapshot snapshot = throwing.load(mixed, MediaSnapshot.empty());
+            assertEquals(1, failures.size());
+            assertEquals(List.of("jf-c2", "jf-d1", "tmdb:2"),
+                    snapshot.seriesPool.stream().map(c -> c.id).toList());
+            assertEquals(MediaSnapshot.Freshness.FRESH,
+                    snapshot.sources.get("jellyfin").freshness);
+        } finally {
+            MediaLoader.reporter = t -> { };
+        }
+    }
+
     @Test public void poolsCapAtSixteen() {
         responses.put("https://jf.example/Users", json("[{\"Id\":\"u1\",\"Name\":\"Alice\"}]"));
         StringBuilder continuing = new StringBuilder("{\"Items\":[");

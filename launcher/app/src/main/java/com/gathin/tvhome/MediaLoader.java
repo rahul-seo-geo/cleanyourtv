@@ -43,6 +43,10 @@ final class MediaLoader {
     private List<MediaCard> lastUpcoming = List.of();
     private boolean running;
 
+    /** One line per swallowed source failure; tests replace it, since android.util.Log is not available there. */
+    static java.util.function.Consumer<Throwable> reporter =
+            t -> android.util.Log.w("tvhome", "media source failed: " + t);
+
     MediaLoader(Fetcher fetcher, Store store, LongSupplier clock) {
         this(fetcher, store, clock, null, null, null, 15L * 60 * 1000, "", "");
     }
@@ -123,7 +127,13 @@ final class MediaLoader {
 
         String seerrUrl = settings.get("seerr_url");
         if (!seerrUrl.isEmpty()) {
-            loadSeerr(seerrUrl, settings.get("seerr_key"), now, statuses, upcomingCards);
+            try {
+                loadSeerr(seerrUrl, settings.get("seerr_key"), now, statuses, upcomingCards);
+            } catch (RuntimeException e) {
+                reporter.accept(e); // one bad response must not starve the other sources
+            }
+            statuses.putIfAbsent("seerr",
+                    new MediaSnapshot.SourceState(MediaSnapshot.Freshness.UNAVAILABLE, now));
             if (statuses.get("seerr").freshness == MediaSnapshot.Freshness.UNAVAILABLE
                     && !lastUpcoming.isEmpty()) {
                 upcomingCards.addAll(lastUpcoming);
@@ -133,8 +143,14 @@ final class MediaLoader {
         String jellyBase = settings.get("jellyfin_url");
         String jellyApiKey = settings.get("jellyfin_key");
         if (!jellyBase.isEmpty() && !jellyApiKey.isEmpty()) {
-            loadJellyfin(jellyBase, jellyApiKey, settings.get("jellyfin_user"), now,
-                    statuses, continueCards, nextUpCards, newEpisodesCards, downloadCards);
+            try {
+                loadJellyfin(jellyBase, jellyApiKey, settings.get("jellyfin_user"), now,
+                        statuses, continueCards, nextUpCards, newEpisodesCards, downloadCards);
+            } catch (RuntimeException e) {
+                reporter.accept(e);
+            }
+            statuses.putIfAbsent("jellyfin",
+                    new MediaSnapshot.SourceState(MediaSnapshot.Freshness.UNAVAILABLE, now));
             if (statuses.get("jellyfin").freshness == MediaSnapshot.Freshness.UNAVAILABLE
                     && (!lastContinue.isEmpty() || !lastNextUp.isEmpty() || !lastNewEpisodes.isEmpty() || !lastDownloads.isEmpty())) {
                 continueCards.addAll(lastContinue);
@@ -148,8 +164,14 @@ final class MediaLoader {
         String sportsdbLeagues = settings.get("sportsdb_leagues");
         if (!settings.get("sportsdb_key").isEmpty()
                 && (!sportsdbTeams.isEmpty() || !sportsdbLeagues.isEmpty())) {
-            loadSportsDb(settings.get("sportsdb_key"), sportsdbTeams, sportsdbLeagues, now,
-                    statuses, sportsPool);
+            try {
+                loadSportsDb(settings.get("sportsdb_key"), sportsdbTeams, sportsdbLeagues, now,
+                        statuses, sportsPool);
+            } catch (RuntimeException e) {
+                reporter.accept(e);
+            }
+            statuses.putIfAbsent("sportsdb",
+                    new MediaSnapshot.SourceState(MediaSnapshot.Freshness.UNAVAILABLE, now));
             if (statuses.get("sportsdb").freshness == MediaSnapshot.Freshness.UNAVAILABLE
                     && !previous.sportsPool.isEmpty()) {
                 sportsPool.addAll(SportsDbSource.heroCards(previous.sportsPool, now, SPORTS_POOL_LIMIT));
@@ -221,7 +243,13 @@ final class MediaLoader {
                 JellyfinSource.latestEpisodesUrl(base, userId, 24),
                 JellyfinSource.latestUrl(base, userId, DOWNLOADS_LIMIT)};
         for (int i = 0; i < urls.length; i++) {
-            byte[] body = fetcher.get(urls[i], headers);
+            byte[] body;
+            try {
+                body = fetcher.get(urls[i], headers);
+            } catch (RuntimeException e) {
+                reporter.accept(e);
+                continue;
+            }
             if (body == null) {
                 body = store.read(keys[i]);
             } else {
@@ -230,18 +258,23 @@ final class MediaLoader {
             }
             if (body == null) continue;
             List<MediaCard> cards;
-            if (i == 0) {
-                cards = JellyfinSource.parseItems(body, base, CONTINUE_LIMIT);
-                continueCards.addAll(cards);
-            } else if (i == 1) {
-                cards = JellyfinSource.parseNextUp(body, base, UPCOMING_LIMIT);
-                nextUpCards.addAll(cards);
-            } else if (i == 2) {
-                cards = JellyfinSource.parseNewEpisodes(body, base, DOWNLOADS_LIMIT);
-                newEpisodesCards.addAll(cards);
-            } else {
-                cards = JellyfinSource.parseLatest(body, base, DOWNLOADS_LIMIT);
-                downloadCards.addAll(cards);
+            try {
+                if (i == 0) {
+                    cards = JellyfinSource.parseItems(body, base, CONTINUE_LIMIT);
+                    continueCards.addAll(cards);
+                } else if (i == 1) {
+                    cards = JellyfinSource.parseNextUp(body, base, UPCOMING_LIMIT);
+                    nextUpCards.addAll(cards);
+                } else if (i == 2) {
+                    cards = JellyfinSource.parseNewEpisodes(body, base, DOWNLOADS_LIMIT);
+                    newEpisodesCards.addAll(cards);
+                } else {
+                    cards = JellyfinSource.parseLatest(body, base, DOWNLOADS_LIMIT);
+                    downloadCards.addAll(cards);
+                }
+            } catch (RuntimeException e) {
+                reporter.accept(e);
+                continue;
             }
             if (!fresh && !cards.isEmpty()) cached = true;
         }

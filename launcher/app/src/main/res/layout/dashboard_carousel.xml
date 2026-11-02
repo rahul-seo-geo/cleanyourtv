@@ -2,6 +2,7 @@
 <merge xmlns:android="http://schemas.android.com/apk/res/android">
 
     <LinearLayout
+        android:id="@+id/tabRow"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="horizontal"
@@ -59,11 +60,11 @@
             android:paddingEnd="24dp" />
     </LinearLayout>
 
-    <HorizontalScrollView
-        android:id="@+id/cardScroll"
+    <!-- The row is centered so the middle slot (scale 1.0) sits mid-screen; the wrapper never
+         clips so the scaled-down neighbours can overflow their layout bounds. -->
+    <FrameLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:scrollbars="none"
         android:clipChildren="false"
         android:clipToPadding="false">
 
@@ -71,10 +72,9 @@
             android:id="@+id/cardRow"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
+            android:layout_gravity="center_horizontal"
             android:orientation="horizontal"
-            android:paddingStart="48dp"
-            android:paddingEnd="48dp"
             android:clipChildren="false"
             android:clipToPadding="false" />
-    </HorizontalScrollView>
+    </FrameLayout>
 </merge>

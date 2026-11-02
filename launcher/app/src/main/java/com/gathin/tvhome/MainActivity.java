@@ -198,7 +198,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
     private MediaSettings mediaSettings;
     private MediaLoader mediaLoader;
     private PosterLoader posterLoader;
-    private HeroStrip heroStrip;
+    private DashboardCarousel dashboardCarousel;
     private View raceBar;
     private LinearLayout racePager;
     private long rotationStart;
@@ -551,20 +551,16 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
                         return !base.isEmpty() && !key.isEmpty() && url.startsWith(base + "/Items/")
                                 ? JellyfinSource.headers(key) : java.util.Map.of();
                     });
-            heroStrip = findViewById(R.id.heroStrip);
-            heroStrip.setHost(this::openMediaCard);
-            heroStrip.setPosterLoader(posterLoader);
+            dashboardCarousel = findViewById(R.id.dashboardCarousel);
+            dashboardCarousel.setHost(this::openMediaCard);
+            dashboardCarousel.setPosterLoader(posterLoader);
             mediaLoader = MediaLoader.create(this, mediaSettings, handler, snapshot -> {
-                MediaBand band = (MediaBand) findViewById(R.id.mediaBand);
-                boolean was = band.getVisibility() == View.VISIBLE;
-                band.apply(snapshot);
-                heroStrip.apply(snapshot);
-                // The band and the race panel trade that space: re-decide the panel the moment the band flips.
-                if (was != (band.getVisibility() == View.VISIBLE)) updatePanel();
-                aimTopButtons(band.getVisibility() == View.VISIBLE);
+                boolean was = dashboardCarousel.getVisibility() == View.VISIBLE;
+                dashboardCarousel.apply(snapshot);
+                // The carousel and the race panel trade that space: re-decide the panel the moment it flips.
+                if (was != (dashboardCarousel.getVisibility() == View.VISIBLE)) updatePanel();
+                aimTopButtons(dashboardCarousel.getVisibility() == View.VISIBLE);
             });
-            ((MediaBand) findViewById(R.id.mediaBand)).setHost(this::openMediaCard);
-            ((MediaBand) findViewById(R.id.mediaBand)).setPosterLoader(posterLoader);
         }
         // The rotation runs on the clock that never jumps: setting the TV's time must not stall or stretch a turn.
         rotationStart = SystemClock.elapsedRealtime();
@@ -884,8 +880,9 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
             if (event.getAction() != KeyEvent.ACTION_DOWN) return false;
             if (keyCode == KeyEvent.KEYCODE_DPAD_UP) return true;
             if (keyCode == KeyEvent.KEYCODE_DPAD_DOWN) {
-                // With the band up, the aimed tab rail (aimTopButtons) must get this key, not the dock return.
-                if (((MediaBand) findViewById(R.id.mediaBand)).getVisibility() == View.VISIBLE) return false;
+                // With the carousel up, the aimed tab rail (aimTopButtons) must get this key, not the dock return.
+                if (dashboardCarousel != null
+                        && dashboardCarousel.getVisibility() == View.VISIBLE) return false;
                 // Back to the dock tile Up came from, not wherever the focus finder lands.
                 focusTile(singleRow ? lastFocused : lastFocused % COLUMNS);
                 return true;
@@ -1384,7 +1381,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
      */
     @Override
     public boolean dispatchKeyEvent(KeyEvent event) {
-        if (heroStrip != null) heroStrip.notifyUserInteraction();
+        if (dashboardCarousel != null) dashboardCarousel.notifyUserInteraction();
         // Vendor keys (TCL Netflix button, 4062) never reach the key services, only the focused window.
         if (event.getKeyCode() >= 1000 && RemoteKeys.handle(this, event, homeAppKeys.get(event.getKeyCode()), null)) return true;
         if (handleSettingsKey(event)) return true;
@@ -2674,10 +2671,10 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
 
     private static final int RACE_RED = 0xFFFF3B2F;
 
-    /** While the media band is up its cards take this space (kickoff data lives in the SPORTS tab). */
+    /** While the dashboard carousel is up its cards take this space (kickoff data lives in the SPORTS tab). */
     private boolean mediaBandShown() {
-        View band = findViewById(R.id.mediaBand);
-        return band != null && band.getVisibility() == View.VISIBLE;
+        return dashboardCarousel != null
+                && dashboardCarousel.getVisibility() == View.VISIBLE;
     }
 
     /**
@@ -3204,6 +3201,12 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
      *  screen when installed, anything with a tmdbId resolves to a Jellyfin item, and the rest just
      *  opens the Jellyfin app. */
     private void openMediaCard(MediaCard card) {
+        if (card.kind == MediaCard.Kind.SPORTS) {
+            // Sports tiles open the configured app (com.cricfytv.sports out of the box); blank or
+            // absent package makes them info-only.
+            MediaLaunch.openPackage(this, mediaSettings.get("sports_app_package"));
+            return;
+        }
         if (card.kind == MediaCard.Kind.LIVE && !card.streamUrl.isEmpty()) {
             MediaLaunch.playStream(this, mediaSettings.get("player_package"), card.streamUrl);
             return;

@@ -396,24 +396,15 @@
             </LinearLayout>
         </RelativeLayout>
 
-        <!-- Hero card and media dashboard: same placement as layout/activity_main.xml. -->
-        <com.gathin.tvhome.HeroStrip
-            android:id="@+id/heroStrip"
+        <!-- Media dashboard: same placement as layout/activity_main.xml. -->
+        <com.gathin.tvhome.DashboardCarousel
+            android:id="@+id/dashboardCarousel"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginStart="10dp"
             android:layout_marginEnd="10dp"
             android:layout_marginTop="30dp"
             android:foreground="@drawable/media_card_focus"
-            android:visibility="gone" />
-
-        <com.gathin.tvhome.MediaBand
-            android:id="@+id/mediaBand"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginStart="10dp"
-            android:layout_marginEnd="10dp"
-            android:layout_marginTop="30dp"
             android:visibility="gone" />
 
         <!-- The wrapper clips at the grid's edge; the grid itself must not clip so scaled tiles can overflow their cells. -->

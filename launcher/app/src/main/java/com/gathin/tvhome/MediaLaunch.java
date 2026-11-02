@@ -51,4 +51,16 @@ final class MediaLaunch {
         if (!playerPackage.isEmpty()) play.setPackage(playerPackage);
         if (ctx.getPackageManager().resolveActivity(play, 0) != null) ctx.startActivity(play);
     }
+
+    /** The app's own launcher entry; a silent no-op when the package is absent or blank. */
+    static void openPackage(Context ctx, String pkg) {
+        if (pkg.isEmpty()) return;
+        Intent launch = ctx.getPackageManager().getLaunchIntentForPackage(pkg);
+        if (launch == null) return;
+        try {
+            ctx.startActivity(launch);
+        } catch (Exception ignored) {
+            // A sports tile is info-only when the configured app cannot be started.
+        }
+    }
 }

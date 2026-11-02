@@ -15,44 +15,36 @@ final class MediaSnapshot {
         SourceState(Freshness freshness, long updatedMs) { this.freshness = freshness; this.updatedMs = updatedMs; }
     }
 
-    final List<MediaCard> movies;
-    final List<MediaCard> series;
-    final List<MediaCard> sports;
-    final List<MediaCard> live;
-    /** Hero strip categories, in rotation order: CONTINUE, DOWNLOADS, UPCOMING, SPORTS-HERO. */
-    final List<MediaCard> continueCards;
-    final List<MediaCard> downloadCards;
-    final List<MediaCard> upcomingCards;
-    final List<MediaCard> sportsHero;
+    /** Per-kind card pools for the dashboard carousel, each built by MediaMix.interleave (movies
+     *  and series) or SportsDbSource.heroCards (sports) and capped at sixteen cards. */
+    final List<MediaCard> moviePool;
+    final List<MediaCard> seriesPool;
+    final List<MediaCard> sportsPool;
     final Map<String, SourceState> sources;
 
-    MediaSnapshot(List<MediaCard> movies, List<MediaCard> series, List<MediaCard> sports,
-                  List<MediaCard> live, List<MediaCard> continueCards, List<MediaCard> downloadCards,
-                  List<MediaCard> upcomingCards, List<MediaCard> sportsHero,
+    MediaSnapshot(List<MediaCard> moviePool, List<MediaCard> seriesPool, List<MediaCard> sportsPool,
                   Map<String, SourceState> sources) {
-        this.movies = Collections.unmodifiableList(new ArrayList<>(movies));
-        this.series = Collections.unmodifiableList(new ArrayList<>(series));
-        this.sports = Collections.unmodifiableList(new ArrayList<>(sports));
-        this.live = Collections.unmodifiableList(new ArrayList<>(live));
-        this.continueCards = Collections.unmodifiableList(new ArrayList<>(continueCards));
-        this.downloadCards = Collections.unmodifiableList(new ArrayList<>(downloadCards));
-        this.upcomingCards = Collections.unmodifiableList(new ArrayList<>(upcomingCards));
-        this.sportsHero = Collections.unmodifiableList(new ArrayList<>(sportsHero));
+        this.moviePool = Collections.unmodifiableList(new ArrayList<>(moviePool));
+        this.seriesPool = Collections.unmodifiableList(new ArrayList<>(seriesPool));
+        this.sportsPool = Collections.unmodifiableList(new ArrayList<>(sportsPool));
         this.sources = Collections.unmodifiableMap(new java.util.HashMap<>(sources));
     }
 
     static MediaSnapshot empty() {
-        return new MediaSnapshot(List.of(), List.of(), List.of(), List.of(),
-                List.of(), List.of(), List.of(), List.of(), Map.of());
+        return new MediaSnapshot(List.of(), List.of(), List.of(), Map.of());
     }
 
     boolean anyContent() {
-        return !movies.isEmpty() || !series.isEmpty() || !sports.isEmpty() || !live.isEmpty();
+        return !moviePool.isEmpty() || !seriesPool.isEmpty() || !sportsPool.isEmpty();
     }
 
-    boolean anyHeroContent() {
-        return !continueCards.isEmpty() || !downloadCards.isEmpty()
-                || !upcomingCards.isEmpty() || !sportsHero.isEmpty();
+    /** The cards of one kind, in their incoming order; the pool inputs stay in source order. */
+    static List<MediaCard> ofKind(List<MediaCard> cards, MediaCard.Kind kind) {
+        List<MediaCard> kept = new ArrayList<>();
+        for (MediaCard card : cards) {
+            if (card.kind == kind) kept.add(card);
+        }
+        return kept;
     }
 
     /**

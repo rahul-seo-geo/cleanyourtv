@@ -15,9 +15,18 @@ public class MediaSnapshotTest {
 
     @Test public void emptySnapshotHasNoContent() {
         MediaSnapshot snapshot = MediaSnapshot.empty();
-        assertTrue(snapshot.movies.isEmpty() && snapshot.series.isEmpty());
-        assertTrue(snapshot.sports.isEmpty() && snapshot.live.isEmpty());
+        assertTrue(snapshot.moviePool.isEmpty() && snapshot.seriesPool.isEmpty());
+        assertTrue(snapshot.sportsPool.isEmpty());
         assertFalse(snapshot.anyContent());
+    }
+
+    @Test public void anyContentLooksAtAllPools() {
+        MediaSnapshot snapshot = new MediaSnapshot(List.of(), List.of(),
+                List.of(new MediaCard("sdb-1", MediaCard.Kind.SPORTS, "AFL", "",
+                        MediaCard.State.UPCOMING, NOW + HOUR, 0, "", "", "")),
+                java.util.Map.of("sportsdb",
+                        new MediaSnapshot.SourceState(MediaSnapshot.Freshness.FRESH, NOW)));
+        assertTrue(snapshot.anyContent());
     }
 
     @Test public void dropExpiredRemovesPastAnchoredCardsButKeepsAvailableOnes() {
@@ -37,13 +46,12 @@ public class MediaSnapshotTest {
         assertEquals(2, MediaSnapshot.dropExpired(List.of(live, done), NOW).size());
     }
 
-    @Test public void anyContentLooksAtAllFourCategories() {
-        MediaSnapshot snapshot = new MediaSnapshot(List.of(), List.of(), List.of(),
-                List.of(new MediaCard("ch", MediaCard.Kind.LIVE, "Channel", "News",
-                        MediaCard.State.AVAILABLE, 0, 0, "", "http://nas/ch.m3u8", "")),
-                List.of(), List.of(), List.of(), List.of(),
-                java.util.Map.of("playlist",
-                        new MediaSnapshot.SourceState(MediaSnapshot.Freshness.FRESH, NOW)));
-        assertTrue(snapshot.anyContent());
+    @Test public void ofKindKeepsOrderAndSkipsOtherKinds() {
+        MediaCard m1 = movie("m1", "One", 0);
+        MediaCard s1 = new MediaCard("s1", MediaCard.Kind.SERIES, "Show", "",
+                MediaCard.State.AVAILABLE, 0, 0, "", "", "");
+        MediaCard m2 = movie("m2", "Two", 0);
+        List<MediaCard> movies = MediaSnapshot.ofKind(List.of(m1, s1, m2), MediaCard.Kind.MOVIE);
+        assertEquals(List.of("m1", "m2"), movies.stream().map(c -> c.id).toList());
     }
 }

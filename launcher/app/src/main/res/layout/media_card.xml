@@ -52,6 +52,23 @@
             android:singleLine="true" />
 
         <TextView
+            android:id="@+id/cardPill"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:paddingStart="8dp"
+            android:paddingEnd="8dp"
+            android:paddingTop="2dp"
+            android:paddingBottom="2dp"
+            android:background="@drawable/card_pill"
+            android:textSize="10sp"
+            android:fontFamily="@string/font_medium"
+            android:letterSpacing="0.08"
+            android:textColor="#E6FFFFFF"
+            android:singleLine="true"
+            android:visibility="gone" />
+
+        <TextView
             android:id="@+id/cardTitle"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"

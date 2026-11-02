@@ -435,9 +435,10 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
         density = getResources().getDisplayMetrics().density;
-        // Fresh process start: pin the first focus to the top bar so the dashboard (which hides while
-        // the grid holds focus) is on screen at boot. Returning from another activity restores its own.
-        bootFocusPending = savedInstanceState == null;
+        // First focus of this activity instance: pin it to the top bar so the dashboard (which hides
+        // while the grid holds focus) is on screen at boot. A warm recreate restores a deep grid row;
+        // returning from another activity restores its own focus and is not the first focus.
+        bootFocusPending = true;
         // config.xml, overlaid by config.json from a pushed theme (see Config and tools/theme.sh).
         Config cfg = Config.load(this);
         homeAppKeys = RemoteKeys.parseAppKeys(cfg.appKeys);
@@ -600,7 +601,12 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
             View gridHost = (View) grid.getParent();
             root.getViewTreeObserver().addOnGlobalFocusChangeListener((oldFocus, newFocus) -> {
                 if (newFocus == null) return;
-                setCarouselSuppressed(isDescendantOf(newFocus, gridHost));
+                boolean inGrid = isDescendantOf(newFocus, gridHost);
+                setCarouselSuppressed(inGrid);
+                // A DOWN from the rail (or its tabs) into the grid always lands on the first row,
+                // even when a previous visit left the grid scrolled to a deep one.
+                if (inGrid && oldFocus != null && !isDescendantOf(oldFocus, gridHost)
+                        && isDescendantOf(oldFocus, dashboardCarousel)) focusTile(0);
             });
         }
         rtlAppGrid = getResources().getBoolean(R.bool.rtl_app_grid);
@@ -1353,6 +1359,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         findViewById(R.id.btnReorder).setNextFocusDownId(target);
         findViewById(R.id.btnLibraryTop).setNextFocusDownId(target);
         findViewById(R.id.btnSettings).setNextFocusDownId(target);
+        for (View button : topAppButtons) button.setNextFocusDownId(target);
     }
 
     @Override
@@ -2529,6 +2536,8 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
             bar.addView(button, bar.indexOfChild(getResources().getBoolean(R.bool.rtl_menu_bar) ? btnVpn : btnWifi));
             topAppButtons.add(button);
         }
+        // The pills were rebuilt, so the DOWN aims set earlier on the old views are gone.
+        aimTopButtons(dashboardCarousel != null && dashboardCarousel.getVisibility() == View.VISIBLE);
     }
 
     @Override public void onLibraryUp() {

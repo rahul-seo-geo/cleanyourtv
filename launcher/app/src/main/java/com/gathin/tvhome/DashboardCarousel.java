@@ -56,6 +56,10 @@ public final class DashboardCarousel extends LinearLayout {
             row.addView(slot);
             slots.add(slot);
         }
+        // Focus chain: the tab rail hands DOWN to the rail, the rail hands DOWN to the app grid.
+        for (int id : TAB_IDS) findViewById(id).setNextFocusDownId(getId());
+        setNextFocusUpId(R.id.tabMovies);
+        setNextFocusDownId(R.id.grid);
         setOnClickListener(v -> openCurrent());
         // D-pad steers the window while the carousel is focused; unhandled keys pass through so
         // focus search and clicks behave as usual. Interaction time is recorded either way.

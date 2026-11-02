@@ -38,9 +38,9 @@ public class MediaLoaderTest {
     private static byte[] json(String s) { return s.getBytes(StandardCharsets.UTF_8); }
 
     @Test public void seerrUpcomingFillsPoolsPerKind() {
-        responses.put("https://seerr.example/api/v1/discover/movies/upcoming?limit=8",
+        responses.put("https://seerr.example/api/v1/discover/movies/upcoming",
                 json("{\"results\":[{\"id\":1,\"title\":\"Next Film\",\"release_date\":\"2030-01-01\"}]}"));
-        responses.put("https://seerr.example/api/v1/discover/tv/upcoming?limit=8",
+        responses.put("https://seerr.example/api/v1/discover/tv/upcoming",
                 json("{\"results\":[{\"id\":2,\"name\":\"Next Show\",\"first_air_date\":\"2030-01-01\"}]}"));
 
         MediaSnapshot snapshot = loader().load(settings(), MediaSnapshot.empty());
@@ -103,9 +103,9 @@ public class MediaLoaderTest {
                         + "{\"Id\":\"c2\",\"Name\":\"Resume Show\",\"Type\":\"Series\"}]}"));
         responses.put("https://jf.example/Users/u1/Items/Latest?Limit=8",
                 json("[{\"Id\":\"d1\",\"Name\":\"Just Added Film\",\"Type\":\"Movie\"}]"));
-        responses.put("https://seerr.example/api/v1/discover/movies/upcoming?limit=8",
+        responses.put("https://seerr.example/api/v1/discover/movies/upcoming",
                 json("{\"results\":[{\"id\":1,\"title\":\"Next Film\",\"release_date\":\"2030-01-01\"}]}"));
-        responses.put("https://seerr.example/api/v1/discover/tv/upcoming?limit=8",
+        responses.put("https://seerr.example/api/v1/discover/tv/upcoming",
                 json("{\"results\":[{\"id\":2,\"name\":\"Next Show\",\"first_air_date\":\"2030-01-01\"}]}"));
         MediaSettings mixed = MediaSettings.parse(
                 "jellyfin_url=https://jf.example\njellyfin_key=k\njellyfin_user=alice"
@@ -132,7 +132,7 @@ public class MediaLoaderTest {
                         + "\"Name\":\"Fresh Ep\"}]"));
         responses.put("https://jf.example/Users/u1/Items/Latest?Limit=8",
                 json("[{\"Id\":\"d1\",\"Name\":\"Added Show\",\"Type\":\"Series\"}]"));
-        responses.put("https://seerr.example/api/v1/discover/tv/upcoming?limit=8",
+        responses.put("https://seerr.example/api/v1/discover/tv/upcoming",
                 json("{\"results\":[{\"id\":2,\"name\":\"Upcoming Show\",\"first_air_date\":\"2030-01-01\"}]}"));
         MediaSettings mixed = MediaSettings.parse(
                 "jellyfin_url=https://jf.example\njellyfin_key=k\njellyfin_user=alice"
@@ -150,7 +150,7 @@ public class MediaLoaderTest {
                 json("{\"Items\":[{\"Id\":\"c2\",\"Name\":\"Resume Show\",\"Type\":\"Series\"}]}"));
         responses.put("https://jf.example/Users/u1/Items/Latest?Limit=8",
                 json("[{\"Id\":\"d1\",\"Name\":\"Added Show\",\"Type\":\"Series\"}]"));
-        responses.put("https://seerr.example/api/v1/discover/tv/upcoming?limit=8",
+        responses.put("https://seerr.example/api/v1/discover/tv/upcoming",
                 json("{\"results\":[{\"id\":2,\"name\":\"Upcoming Show\",\"first_air_date\":\"2030-01-01\"}]}"));
         List<Throwable> failures = new ArrayList<>();
         MediaLoader.reporter = failures::add;
@@ -193,9 +193,9 @@ public class MediaLoaderTest {
             if (i > 1) upcoming.append(',');
             upcoming.append("{\"id\":").append(i).append(",\"title\":\"Film\"}");
         }
-        responses.put("https://seerr.example/api/v1/discover/movies/upcoming?limit=8",
+        responses.put("https://seerr.example/api/v1/discover/movies/upcoming",
                 json(upcoming.append("]}").toString()));
-        responses.put("https://seerr.example/api/v1/discover/tv/upcoming?limit=8",
+        responses.put("https://seerr.example/api/v1/discover/tv/upcoming",
                 json("{\"results\":[]}"));
         MediaSettings mixed = MediaSettings.parse(
                 "jellyfin_url=https://jf.example\njellyfin_key=k"

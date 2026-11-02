@@ -204,8 +204,8 @@ final class MediaLoader {
         boolean fresh = false;
         boolean cached = false;
         String[] keys = {"seerr-upcoming-movie", "seerr-upcoming-series"};
-        String[] urls = {SeerrSource.upcomingUrl(base, MediaCard.Kind.MOVIE, UPCOMING_LIMIT),
-                SeerrSource.upcomingUrl(base, MediaCard.Kind.SERIES, UPCOMING_LIMIT)};
+        String[] urls = {SeerrSource.upcomingUrl(base, MediaCard.Kind.MOVIE),
+                SeerrSource.upcomingUrl(base, MediaCard.Kind.SERIES)};
         for (int i = 0; i < keys.length; i++) {
             byte[] body = fetcher.get(urls[i], headers);
             if (body == null) {

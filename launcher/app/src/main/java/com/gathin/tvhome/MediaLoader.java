@@ -302,6 +302,12 @@ final class MediaLoader {
         for (String league : leagues.split(",")) {
             league = league.trim();
             if (league.isEmpty()) continue;
+            try {
+                Thread.sleep(1000); // smooth the burst: the free key rate-limits back-to-back calls
+            } catch (InterruptedException ignored) {
+                Thread.currentThread().interrupt();
+                return;
+            }
             byte[] body = fetcher.get(SportsDbSource.eventsLeagueUrl(apiKey, league), Map.of());
             if (body == null) continue;
             fresh = true;

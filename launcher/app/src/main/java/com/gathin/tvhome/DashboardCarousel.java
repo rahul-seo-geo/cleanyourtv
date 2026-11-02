@@ -36,6 +36,7 @@ public final class DashboardCarousel extends LinearLayout {
     private final Runnable tick = this::rotate;
     private MediaSnapshot snapshot = MediaSnapshot.empty();
     private int selected; // index into ORDER
+    private boolean suppressed; // focus is in the app grid; cards stay hidden until it returns
     private CarouselRotation rotation = new CarouselRotation(1);
     private final List<View> slots = new ArrayList<>();
     private long lastKeyMs;
@@ -75,9 +76,16 @@ public final class DashboardCarousel extends LinearLayout {
     /** Any remote input pauses rotation for a while; the activity forwards keys it sees itself. */
     void notifyUserInteraction() { lastKeyMs = SystemClock.uptimeMillis(); }
 
+    /** Focus moved into (or out of) the app grid: the cards give up their space until it comes back. */
+    void setSuppressed(boolean suppressed) {
+        if (this.suppressed == suppressed) return;
+        this.suppressed = suppressed;
+        apply(snapshot);
+    }
+
     void apply(MediaSnapshot next) {
         snapshot = next;
-        boolean any = next.anyContent();
+        boolean any = next.anyContent() && !suppressed;
         setVisibility(any ? VISIBLE : GONE);
         if (!any) { stopRotation(); return; }
         if (pool().isEmpty()) selected = firstNonEmptyTab();

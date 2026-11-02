@@ -56,6 +56,7 @@ import android.util.TypedValue;
 import android.view.Gravity;
 import android.view.KeyEvent;
 import android.view.View;
+import android.view.ViewParent;
 import android.view.SoundEffectConstants;
 import android.view.ViewGroup;
 import android.view.ViewTreeObserver;
@@ -199,6 +200,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
     private MediaLoader mediaLoader;
     private PosterLoader posterLoader;
     private DashboardCarousel dashboardCarousel;
+    private boolean carouselSuppressed; // grid tiles hold focus; the cards are hidden until it returns
     private View raceBar;
     private LinearLayout racePager;
     private long rotationStart;
@@ -588,6 +590,15 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         libraryExcludedApps = new HashSet<>(cfg.libraryExcludedApps);
 
         grid = findViewById(R.id.grid);
+        // The app grid sits below the carousel in one fixed-height screen. While grid tiles hold
+        // focus the cards hide and hand their space to the grid; any focus back above restores them.
+        if (dashboardCarousel != null) {
+            View gridHost = (View) grid.getParent();
+            root.getViewTreeObserver().addOnGlobalFocusChangeListener((oldFocus, newFocus) -> {
+                if (newFocus == null) return;
+                setCarouselSuppressed(isDescendantOf(newFocus, gridHost));
+            });
+        }
         rtlAppGrid = getResources().getBoolean(R.bool.rtl_app_grid);
         // Mirror only the app grid; the header and other locales keep their own layouts.
         // single_row: one span laid out sideways, so the same adapter, glass and dock band serve a scrolling row.
@@ -2675,6 +2686,26 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
     private boolean mediaBandShown() {
         return dashboardCarousel != null
                 && dashboardCarousel.getVisibility() == View.VISIBLE;
+    }
+
+    /** Hides or restores the carousel when focus drops into (or returns from) the app grid. */
+    private void setCarouselSuppressed(boolean suppressed) {
+        if (carouselSuppressed == suppressed) return;
+        carouselSuppressed = suppressed;
+        boolean was = dashboardCarousel.getVisibility() == View.VISIBLE;
+        dashboardCarousel.setSuppressed(suppressed);
+        if (was != (dashboardCarousel.getVisibility() == View.VISIBLE)) updatePanel();
+        aimTopButtons(dashboardCarousel.getVisibility() == View.VISIBLE);
+    }
+
+    private static boolean isDescendantOf(View view, View ancestor) {
+        for (View v = view; v != null; ) {
+            if (v == ancestor) return true;
+            ViewParent p = v.getParent();
+            if (!(p instanceof View)) return false;
+            v = (View) p;
+        }
+        return false;
     }
 
     /**

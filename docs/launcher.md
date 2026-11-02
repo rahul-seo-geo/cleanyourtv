@@ -99,7 +99,9 @@ contract: [`docs/specs/card.md`](specs/card.md). Ready-made ones are in [`addons
 
 ## Media dashboard
 
-The optional dashboard band reads `dashboard.txt` from the launcher's private storage. Copy
+The optional dashboard is one tabbed auto-rotating carousel above the dock: a Movies, Series and
+Sports tab (only the tabs with cards show), five poster cards per tab with the center card
+largest. It reads `dashboard.txt` from the launcher's private storage. Copy
 [`launcher/dashboard.example.txt`](../launcher/dashboard.example.txt) to `launcher/dashboard.txt`, fill in
 only the sources you use, then run `TV_HOST=<tv address> ./launcher/setup.sh` (or
 `./launcher/setup.ps1 -TvHost <tv address>` in PowerShell) after installing the launcher. You can also
@@ -111,18 +113,19 @@ scripts address the installed package.
 
 | Setting | What it feeds | When blank |
 |---|---|---|
-| `seerr_url`, `seerr_key` | Seerr movies and series, plus the hero's Coming soon category | No Seerr items |
-| `jellyfin_url`, `jellyfin_key` | The hero's Continue watching and New downloads categories, and Jellyfin card launches | No Jellyfin hero items |
-| `jellyfin_user` | Jellyfin user name behind the hero items; the first user is used when blank or unmatched | First user |
-| `sportsdb_key`, `sportsdb_teams` | TheSportsDB key and comma-separated team IDs for the hero's Upcoming games category | Source skipped |
-| `sportsdb_leagues` | Comma-separated league IDs whose next fixtures join the hero's Upcoming games category | League fixtures skipped |
+| `seerr_url`, `seerr_key` | Seerr upcoming movies and series, mixed into the carousel's Movies and Series tabs | No Seerr items |
+| `jellyfin_url`, `jellyfin_key` | Continue watching and latest additions in the Movies/Series tabs, and Jellyfin card launches | No Jellyfin items |
+| `jellyfin_user` | Jellyfin user name behind those items; the first user is used when blank or unmatched | First user |
+| `sportsdb_key`, `sportsdb_teams` | TheSportsDB key and comma-separated team IDs for the Sports tab | Source skipped |
+| `sportsdb_leagues` | Comma-separated league IDs whose next fixtures join the Sports tab | League fixtures skipped |
+| `sports_app_package` | App a sports card opens (default `com.cricfytv.sports`) | Sports tiles are info-only |
 | `jellyfin_package` | Reserved for a Jellyfin app target; not consumed yet | No effect |
 | `player_package` | Reserved for a preferred player target; not consumed yet | No effect |
-| `m3u_url` | M3U playlist channels | No playlist channels |
-| `game_day_pkg` | Match-day provider add-on (the same package as `config.xml` `game_day`) | No match-day items |
+| `m3u_url` | No longer consumed by the dashboard; kept only so old files still parse | No effect |
+| `game_day_pkg` | No longer consumed by the dashboard (the race panel uses `config.xml` `game_day`) | No effect |
 | `refresh_minutes` | Refresh while Home is visible | 15 minutes; values below 1 become 1 |
 
-With no source configured, the dashboard band stays hidden and Home works as before. On-device
+With no source configured, the dashboard stays hidden and Home works as before. On-device
 provider access and dashboard behavior are checked separately during TV verification.
 
 ## Clock screensaver

@@ -4,17 +4,19 @@ seerr_url=
 seerr_key=
 jellyfin_url=
 jellyfin_key=
-# jellyfin_user: user name for the hero items; blank uses the first user
+# jellyfin_user: user name for the Jellyfin items; blank uses the first user
 jellyfin_user=
-# sportsdb_key / sportsdb_teams: TheSportsDB fixtures for the hero (comma-separated team IDs)
+# sportsdb_key / sportsdb_teams: TheSportsDB fixtures for the Sports tab (comma-separated team IDs)
 sportsdb_key=
 sportsdb_teams=
-# sportsdb_leagues: comma-separated league IDs added to the hero alongside the team fixtures
+# sportsdb_leagues: comma-separated league IDs added to the Sports tab alongside the team fixtures
 sportsdb_leagues=
 jellyfin_package=
 player_package=
+# sports_app_package: app a sports card opens (default com.cricfytv.sports); blank = info-only tiles
+sports_app_package=com.cricfytv.sports
+# m3u_url and game_day_pkg are no longer consumed by the dashboard; kept only for old files
 m3u_url=
-# game_day_pkg is the same add-on package the race panel uses (config.xml game_day)
 game_day_pkg=
 # minutes between refreshes while Home is visible (default 15, minimum 1)
 refresh_minutes=

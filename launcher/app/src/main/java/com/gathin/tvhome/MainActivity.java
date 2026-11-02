@@ -201,6 +201,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
     private PosterLoader posterLoader;
     private DashboardCarousel dashboardCarousel;
     private boolean carouselSuppressed; // grid tiles hold focus; the cards are hidden until it returns
+    private boolean bootFocusPending;   // fresh process start: the first focus must not land in the grid
     private View raceBar;
     private LinearLayout racePager;
     private long rotationStart;
@@ -434,6 +435,9 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
         density = getResources().getDisplayMetrics().density;
+        // Fresh process start: pin the first focus to the top bar so the dashboard (which hides while
+        // the grid holds focus) is on screen at boot. Returning from another activity restores its own.
+        bootFocusPending = savedInstanceState == null;
         // config.xml, overlaid by config.json from a pushed theme (see Config and tools/theme.sh).
         Config cfg = Config.load(this);
         homeAppKeys = RemoteKeys.parseAppKeys(cfg.appKeys);
@@ -1329,6 +1333,14 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
             startPendingSettingsReorder();
             if (libraryFocusPending && appLibrary == null) focusLibrary();
             showCardPrompt();
+            if (bootFocusPending) {
+                bootFocusPending = false;
+                // The focus search can point at a grid tile before the top bar exists in the tree; the
+                // dashboard would then boot hidden. Put the first focus on the top bar instead.
+                View focus = getCurrentFocus();
+                if (focus == null || isDescendantOf(focus, (View) grid.getParent()))
+                    firstTopButton().requestFocus();
+            }
         }
     }
 

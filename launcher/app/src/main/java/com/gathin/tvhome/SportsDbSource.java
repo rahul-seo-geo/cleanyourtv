@@ -109,6 +109,16 @@ final class SportsDbSource {
         return cards;
     }
 
+    /** Event art for a league card: portrait poster first, then square art, then badges. */
+    static String leagueArt(JSONObject event) {
+        String art = absoluteBadge(event.optString("strPoster", ""));
+        if (art.isEmpty()) art = absoluteBadge(event.optString("strThumb", ""));
+        if (art.isEmpty()) art = absoluteBadge(event.optString("strSquare", ""));
+        if (art.isEmpty()) art = absoluteBadge(event.optString("strLeagueBadge", ""));
+        if (art.isEmpty()) art = absoluteBadge(event.optString("strHomeTeamBadge", ""));
+        return art;
+    }
+
     /** The league's next event; the fixture itself is the card, with no badge art. */
     static List<MediaCard> parseLeague(byte[] body, long nowMs) {
         List<MediaCard> cards = new ArrayList<>();
@@ -126,8 +136,7 @@ final class SportsDbSource {
                 title = event.optString("strHomeTeam", "") + " vs "
                         + event.optString("strAwayTeam", "");
             }
-            String art = event.optString("strThumb", "");
-            if (!art.startsWith("http://") && !art.startsWith("https://")) art = "";
+            String art = leagueArt(event);
             long kickoff = kickoffMs(event.optString("dateEvent", ""), event.optString("strTime", ""));
             cards.add(new MediaCard("sdb-" + idEvent, MediaCard.Kind.SPORTS, title,
                     line(event.optString("strLeague", ""), kickoff),

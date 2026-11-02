@@ -166,11 +166,28 @@ public class SportsDbSourceTest {
         assertTrue(card.line, card.line.startsWith("Test League · "));
     }
 
-    @Test public void leagueCardDropsMissingAndNonAbsoluteThumb() {
-        assertEquals("", parseLeague("[" + leagueEvent("1", "Home FC vs Away FC", "") + "]")
-                .get(0).artUrl);
-        assertEquals("", parseLeague("[" + leagueEvent("1", "Home FC vs Away FC", "/pic/x.png") + "]")
-                .get(0).artUrl);
+    @Test public void leagueCardPrefersPosterOverThumb() {
+        String ev = leagueEvent("1", "Home FC vs Away FC", "https://cdn.example/thumb.jpg")
+                .replace("\"strStatus\"",
+                        "\"strPoster\":\"https://cdn.example/poster.jpg\",\"strStatus\"");
+        assertEquals("https://cdn.example/poster.jpg", parseLeague("[" + ev + "]").get(0).artUrl);
+    }
+
+    @Test public void leagueCardResolvesRelativeEventArt() {
+        assertEquals("https://www.thesportsdb.com/pic/x.png",
+                parseLeague("[" + leagueEvent("1", "Home FC vs Away FC", "/pic/x.png") + "]")
+                        .get(0).artUrl);
+    }
+
+    @Test public void leagueCardFallsBackToLeagueBadge() {
+        String ev = leagueEvent("1", "Home FC vs Away FC", "")
+                .replace("\"strStatus\"",
+                        "\"strLeagueBadge\":\"/pic/league.png\",\"strStatus\"");
+        assertEquals("https://www.thesportsdb.com/pic/league.png",
+                parseLeague("[" + ev + "]").get(0).artUrl);
+    }
+
+    @Test public void leagueCardDropsProtocolRelativeArt() {
         assertEquals("", parseLeague("[" + leagueEvent("1", "Home FC vs Away FC",
                 "//cdn.example/x.png") + "]").get(0).artUrl);
     }

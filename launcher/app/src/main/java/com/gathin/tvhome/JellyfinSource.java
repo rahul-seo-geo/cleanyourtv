@@ -37,9 +37,17 @@ final class JellyfinSource {
                 + "/Items?Recursive=true&Filters=IsResumable&SortBy=LastPlayedDate&SortOrder=Descending&Limit=" + limit;
     }
 
+    static String nextUpUrl(String base, String userId, int limit) {
+        return base + "/Shows/NextUp?userId=" + userId + "&Limit=" + limit;
+    }
+
     /** The Latest endpoint answers a bare JSON array, unlike the Items envelope. */
     static String latestUrl(String base, String userId, int limit) {
         return base + "/Users/" + userId + "/Items/Latest?Limit=" + limit;
+    }
+
+    static String latestEpisodesUrl(String base, String userId, int limit) {
+        return base + "/Users/" + userId + "/Items/Latest?Limit=" + limit + "&IncludeItemTypes=Episode";
     }
 
     static String posterUrl(String base, String itemId) {
@@ -51,8 +59,61 @@ final class JellyfinSource {
         return cards(page == null ? null : page.optJSONArray("Items"), base, limit);
     }
 
+    static List<MediaCard> parseNextUp(byte[] body, String base, int limit) {
+        JSONObject page = object(body);
+        return episodeCards(page == null ? null : page.optJSONArray("Items"), base, limit, false);
+    }
+
+    static List<MediaCard> parseNewEpisodes(byte[] body, String base, int limit) {
+        return episodeCards(array(body), base, limit, true);
+    }
+
     static List<MediaCard> parseLatest(byte[] body, String base, int limit) {
         return cards(array(body), base, limit);
+    }
+
+    private static List<MediaCard> episodeCards(JSONArray items, String base, int limit, boolean deduplicateBySeries) {
+        List<MediaCard> cards = new ArrayList<>();
+        if (items == null) return cards;
+        java.util.Set<String> seenSeries = new java.util.HashSet<>();
+        for (int i = 0; i < items.length() && cards.size() < limit; i++) {
+            JSONObject item = items.optJSONObject(i);
+            if (item == null) continue;
+            String id = item.optString("Id", "");
+            String seriesId = item.optString("SeriesId", "");
+            String seriesName = item.optString("SeriesName", "");
+            if (id.isEmpty()) continue;
+            if (seriesName.isEmpty()) seriesName = item.optString("Name", "");
+            if (seriesName.isEmpty()) continue;
+            if (deduplicateBySeries && !seriesId.isEmpty()) {
+                if (!seenSeries.add(seriesId)) continue;
+            }
+            String line = parseEpisodeLine(item);
+            if (deduplicateBySeries) line = line.isEmpty() ? "New" : "New: " + line;
+            String artId = seriesId.isEmpty() ? id : seriesId;
+            cards.add(new MediaCard("jf-" + id, MediaCard.Kind.SERIES, seriesName,
+                    line, MediaCard.State.AVAILABLE, 0, 0, "", "", posterUrl(base, artId)));
+        }
+        return cards;
+    }
+
+    private static String parseEpisodeLine(JSONObject item) {
+        int season = item.optInt("ParentIndexNumber", 0);
+        int episode = item.optInt("IndexNumber", 0);
+        String epName = item.optString("Name", "");
+        StringBuilder sb = new StringBuilder();
+        if (season > 0 && episode > 0) {
+            sb.append("S").append(season).append(" E").append(episode);
+        } else if (season > 0) {
+            sb.append("S").append(season);
+        } else if (episode > 0) {
+            sb.append("E").append(episode);
+        }
+        if (!epName.isEmpty()) {
+            if (sb.length() > 0) sb.append(" · ");
+            sb.append(epName);
+        }
+        return sb.toString();
     }
 
     private static List<MediaCard> cards(JSONArray items, String base, int limit) {

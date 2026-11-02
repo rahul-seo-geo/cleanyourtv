@@ -37,6 +37,8 @@ final class MediaLoader {
     private MediaSnapshot last = MediaSnapshot.empty();
     // Last-known raw source lists: an unavailable source's pool contribution is rebuilt from these.
     private List<MediaCard> lastContinue = List.of();
+    private List<MediaCard> lastNextUp = List.of();
+    private List<MediaCard> lastNewEpisodes = List.of();
     private List<MediaCard> lastDownloads = List.of();
     private List<MediaCard> lastUpcoming = List.of();
     private boolean running;
@@ -113,6 +115,8 @@ final class MediaLoader {
         long now = clock.getAsLong();
         Map<String, MediaSnapshot.SourceState> statuses = new HashMap<>();
         List<MediaCard> continueCards = new ArrayList<>();
+        List<MediaCard> nextUpCards = new ArrayList<>();
+        List<MediaCard> newEpisodesCards = new ArrayList<>();
         List<MediaCard> downloadCards = new ArrayList<>();
         List<MediaCard> upcomingCards = new ArrayList<>();
         List<MediaCard> sportsPool = new ArrayList<>();
@@ -130,10 +134,12 @@ final class MediaLoader {
         String jellyApiKey = settings.get("jellyfin_key");
         if (!jellyBase.isEmpty() && !jellyApiKey.isEmpty()) {
             loadJellyfin(jellyBase, jellyApiKey, settings.get("jellyfin_user"), now,
-                    statuses, continueCards, downloadCards);
+                    statuses, continueCards, nextUpCards, newEpisodesCards, downloadCards);
             if (statuses.get("jellyfin").freshness == MediaSnapshot.Freshness.UNAVAILABLE
-                    && (!lastContinue.isEmpty() || !lastDownloads.isEmpty())) {
+                    && (!lastContinue.isEmpty() || !lastNextUp.isEmpty() || !lastNewEpisodes.isEmpty() || !lastDownloads.isEmpty())) {
                 continueCards.addAll(lastContinue);
+                nextUpCards.addAll(lastNextUp);
+                newEpisodesCards.addAll(lastNewEpisodes);
                 downloadCards.addAll(lastDownloads);
                 statuses.put("jellyfin", new MediaSnapshot.SourceState(MediaSnapshot.Freshness.STALE, now));
             }
@@ -152,6 +158,8 @@ final class MediaLoader {
             }
         }
         lastContinue = MediaSnapshot.dropExpired(continueCards, now);
+        lastNextUp = MediaSnapshot.dropExpired(nextUpCards, now);
+        lastNewEpisodes = MediaSnapshot.dropExpired(newEpisodesCards, now);
         lastDownloads = MediaSnapshot.dropExpired(downloadCards, now);
         lastUpcoming = MediaSnapshot.dropExpired(upcomingCards, now);
         List<MediaCard> moviePool = MediaMix.interleave(List.of(
@@ -160,6 +168,8 @@ final class MediaLoader {
                 MediaSnapshot.ofKind(lastUpcoming, MediaCard.Kind.MOVIE)), POOL_CAP);
         List<MediaCard> seriesPool = MediaMix.interleave(List.of(
                 MediaSnapshot.ofKind(lastContinue, MediaCard.Kind.SERIES),
+                MediaSnapshot.ofKind(lastNextUp, MediaCard.Kind.SERIES),
+                MediaSnapshot.ofKind(lastNewEpisodes, MediaCard.Kind.SERIES),
                 MediaSnapshot.ofKind(lastDownloads, MediaCard.Kind.SERIES),
                 MediaSnapshot.ofKind(lastUpcoming, MediaCard.Kind.SERIES)), POOL_CAP);
         return new MediaSnapshot(moviePool, seriesPool, sportsPool, statuses);
@@ -198,14 +208,17 @@ final class MediaLoader {
 
     private void loadJellyfin(String base, String apiKey, String userName, long now,
                               Map<String, MediaSnapshot.SourceState> statuses,
-                              List<MediaCard> continueCards, List<MediaCard> downloadCards) {
+                              List<MediaCard> continueCards, List<MediaCard> nextUpCards,
+                              List<MediaCard> newEpisodesCards, List<MediaCard> downloadCards) {
         Map<String, String> headers = JellyfinSource.headers(apiKey);
         String userId = JellyfinSource.resolveUser(fetcher, base, apiKey, userName);
         boolean fresh = false;
         boolean cached = false;
-        String[] keys = {"jellyfin-continue", "jellyfin-latest"};
+        String[] keys = {"jellyfin-continue", "jellyfin-next-up", "jellyfin-new-episodes", "jellyfin-latest"};
         String[] urls = userId == null ? new String[0] : new String[] {
                 JellyfinSource.continueUrl(base, userId, CONTINUE_LIMIT),
+                JellyfinSource.nextUpUrl(base, userId, UPCOMING_LIMIT),
+                JellyfinSource.latestEpisodesUrl(base, userId, 24),
                 JellyfinSource.latestUrl(base, userId, DOWNLOADS_LIMIT)};
         for (int i = 0; i < urls.length; i++) {
             byte[] body = fetcher.get(urls[i], headers);
@@ -216,10 +229,21 @@ final class MediaLoader {
                 fresh = true;
             }
             if (body == null) continue;
-            List<MediaCard> cards = i == 0 ? JellyfinSource.parseItems(body, base, CONTINUE_LIMIT)
-                    : JellyfinSource.parseLatest(body, base, DOWNLOADS_LIMIT);
+            List<MediaCard> cards;
+            if (i == 0) {
+                cards = JellyfinSource.parseItems(body, base, CONTINUE_LIMIT);
+                continueCards.addAll(cards);
+            } else if (i == 1) {
+                cards = JellyfinSource.parseNextUp(body, base, UPCOMING_LIMIT);
+                nextUpCards.addAll(cards);
+            } else if (i == 2) {
+                cards = JellyfinSource.parseNewEpisodes(body, base, DOWNLOADS_LIMIT);
+                newEpisodesCards.addAll(cards);
+            } else {
+                cards = JellyfinSource.parseLatest(body, base, DOWNLOADS_LIMIT);
+                downloadCards.addAll(cards);
+            }
             if (!fresh && !cards.isEmpty()) cached = true;
-            (i == 0 ? continueCards : downloadCards).addAll(cards);
         }
         statuses.put("jellyfin", new MediaSnapshot.SourceState(fresh
                 ? MediaSnapshot.Freshness.FRESH

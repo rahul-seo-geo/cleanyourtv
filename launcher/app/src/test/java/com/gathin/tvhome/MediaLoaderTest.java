@@ -119,6 +119,30 @@ public class MediaLoaderTest {
         assertEquals(MediaSnapshot.Freshness.FRESH, snapshot.sources.get("jellyfin").freshness);
     }
 
+    @Test public void seriesPoolInterleavesNextUpAndNewEpisodesBetweenContinueAndUpcoming() {
+        responses.put("https://jf.example/Users", json("[{\"Id\":\"u1\",\"Name\":\"Alice\"}]"));
+        responses.put("https://jf.example/Users/u1/Items?Recursive=true&Filters=IsResumable"
+                        + "&SortBy=LastPlayedDate&SortOrder=Descending&Limit=8",
+                json("{\"Items\":[{\"Id\":\"c1\",\"Name\":\"Resume Show\",\"Type\":\"Series\"}]}"));
+        responses.put("https://jf.example/Shows/NextUp?userId=u1&Limit=8",
+                json("{\"Items\":[{\"Id\":\"n1\",\"SeriesId\":\"s1\",\"SeriesName\":\"Next Show\","
+                        + "\"Name\":\"Next Ep\"}]}"));
+        responses.put("https://jf.example/Users/u1/Items/Latest?Limit=24&IncludeItemTypes=Episode",
+                json("[{\"Id\":\"w1\",\"SeriesId\":\"s2\",\"SeriesName\":\"Fresh Show\","
+                        + "\"Name\":\"Fresh Ep\"}]"));
+        responses.put("https://jf.example/Users/u1/Items/Latest?Limit=8",
+                json("[{\"Id\":\"d1\",\"Name\":\"Added Show\",\"Type\":\"Series\"}]"));
+        responses.put("https://seerr.example/api/v1/discover/tv/upcoming?limit=8",
+                json("{\"results\":[{\"id\":2,\"name\":\"Upcoming Show\",\"first_air_date\":\"2030-01-01\"}]}"));
+        MediaSettings mixed = MediaSettings.parse(
+                "jellyfin_url=https://jf.example\njellyfin_key=k\njellyfin_user=alice"
+                        + "\nseerr_url=https://seerr.example\nseerr_key=k");
+
+        MediaSnapshot snapshot = loader().load(mixed, MediaSnapshot.empty());
+        assertEquals(List.of("jf-c1", "jf-n1", "jf-w1", "jf-d1", "tmdb:2"),
+                snapshot.seriesPool.stream().map(c -> c.id).toList());
+    }
+
     @Test public void poolsCapAtSixteen() {
         responses.put("https://jf.example/Users", json("[{\"Id\":\"u1\",\"Name\":\"Alice\"}]"));
         StringBuilder continuing = new StringBuilder("{\"Items\":[");

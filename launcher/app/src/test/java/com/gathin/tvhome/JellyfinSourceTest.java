@@ -87,4 +87,45 @@ public class JellyfinSourceTest {
         assertTrue(JellyfinSource.parseItems(json("{}"), BASE, 6).isEmpty());
         assertTrue(JellyfinSource.parseLatest(json("{\"Items\":[]}"), BASE, 5).isEmpty());
     }
+
+    @Test public void nextUpAndLatestEpisodesUrlsTargetTheResolvedUser() {
+        assertEquals(BASE + "/Shows/NextUp?userId=u1&Limit=7",
+                JellyfinSource.nextUpUrl(BASE, "u1", 7));
+        assertEquals(BASE + "/Users/u1/Items/Latest?Limit=24&IncludeItemTypes=Episode",
+                JellyfinSource.latestEpisodesUrl(BASE, "u1", 24));
+    }
+
+    @Test public void parsesNextUpEpisodesIntoSeriesCards() {
+        byte[] body = json("{\"Items\":[{\"Id\":\"e1\",\"Type\":\"Episode\",\"SeriesId\":\"s1\","
+                + "\"SeriesName\":\"A Show\",\"ParentIndexNumber\":2,\"IndexNumber\":3,"
+                + "\"Name\":\"The Episode\"}]}");
+        List<MediaCard> cards = JellyfinSource.parseNextUp(body, BASE, 5);
+        assertEquals(1, cards.size());
+        MediaCard card = cards.get(0);
+        assertEquals(MediaCard.Kind.SERIES, card.kind);
+        assertEquals("A Show", card.title);
+        assertEquals("S2 E3 · The Episode", card.line);
+        assertEquals(BASE + "/Items/s1/Images/Primary?maxWidth=342&quality=90", card.artUrl);
+    }
+
+    @Test public void episodeLineOmitsMissingSeasonAndEpisode() {
+        byte[] body = json("{\"Items\":[{\"Id\":\"e1\",\"SeriesId\":\"s1\",\"SeriesName\":\"A Show\","
+                + "\"Name\":\"The Episode\"}]}");
+        assertEquals("The Episode", JellyfinSource.parseNextUp(body, BASE, 5).get(0).line);
+    }
+
+    @Test public void parsesNewEpisodesDeduplicatedBySeriesWithNewPrefix() {
+        byte[] body = json("[{\"Id\":\"e1\",\"SeriesId\":\"s1\",\"SeriesName\":\"A Show\","
+                + "\"ParentIndexNumber\":1,\"IndexNumber\":9,\"Name\":\"Latest Ep\"},"
+                + "{\"Id\":\"e2\",\"SeriesId\":\"s1\",\"SeriesName\":\"A Show\","
+                + "\"ParentIndexNumber\":1,\"IndexNumber\":8,\"Name\":\"Older Ep\"},"
+                + "{\"Id\":\"e3\",\"SeriesId\":\"s2\",\"SeriesName\":\"B Show\","
+                + "\"ParentIndexNumber\":4,\"IndexNumber\":1,\"Name\":\"B Ep\"}]");
+        List<MediaCard> cards = JellyfinSource.parseNewEpisodes(body, BASE, 8);
+        assertEquals(2, cards.size());
+        assertEquals("A Show", cards.get(0).title);
+        assertEquals("New: S1 E9 · Latest Ep", cards.get(0).line);
+        assertEquals("B Show", cards.get(1).title);
+        assertEquals("New: S4 E1 · B Ep", cards.get(1).line);
+    }
 }
